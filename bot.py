@@ -145,10 +145,39 @@ class PurchaseButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Opening your ticket...", ephemeral=True)
-        channel = await _open_ticket(interaction, TICKET_PURCHASE_CATEGORY_ID, "purchase")
-        if channel is None:
+        # respond instantly — Discord requires a response within 3s
+        await interaction.response.send_message("⏳ Opening your ticket...", ephemeral=True)
+
+        guild      = interaction.guild
+        user       = interaction.user
+        existing   = await _find_user_ticket(guild, user.id)
+        if existing:
+            await interaction.edit_original_response(content=f"You already have an open ticket: {existing.mention}")
             return
+
+        category   = guild.get_channel(TICKET_PURCHASE_CATEGORY_ID)
+        staff_role = guild.get_role(STAFF_ROLE_ID)
+        if category is None:
+            await interaction.edit_original_response(content="❌ Purchase category not found.")
+            return
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            user:               discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me:           discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        }
+        if staff_role:
+            overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
+        try:
+            channel = await guild.create_text_channel(
+                f"purchase-{user.name}", category=category,
+                overwrites=overwrites, topic=f"owner:{user.id}",
+            )
+        except Exception as e:
+            await interaction.edit_original_response(content=f"❌ Error: {e}")
+            return
+
         ltc     = await _usd_to_ltc(PRICE_USD)
         ltc_str = f"{ltc} LTC" if ltc else "Ask staff (rate unavailable)"
         await channel.send(view=PurchaseTicketView(ltc_str))
@@ -165,10 +194,38 @@ class SupportButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Opening your ticket...", ephemeral=True)
-        channel = await _open_ticket(interaction, TICKET_SUPPORT_CATEGORY_ID, "support")
-        if channel is None:
+        await interaction.response.send_message("⏳ Opening your ticket...", ephemeral=True)
+
+        guild      = interaction.guild
+        user       = interaction.user
+        existing   = await _find_user_ticket(guild, user.id)
+        if existing:
+            await interaction.edit_original_response(content=f"You already have an open ticket: {existing.mention}")
             return
+
+        category   = guild.get_channel(TICKET_SUPPORT_CATEGORY_ID)
+        staff_role = guild.get_role(STAFF_ROLE_ID)
+        if category is None:
+            await interaction.edit_original_response(content="❌ Support category not found.")
+            return
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            user:               discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me:           discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        }
+        if staff_role:
+            overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
+        try:
+            channel = await guild.create_text_channel(
+                f"support-{user.name}", category=category,
+                overwrites=overwrites, topic=f"owner:{user.id}",
+            )
+        except Exception as e:
+            await interaction.edit_original_response(content=f"❌ Error: {e}")
+            return
+
         await channel.send(view=SupportTicketView())
         await interaction.edit_original_response(content=f"✅ Ticket opened: {channel.mention}")
 
