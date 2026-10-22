@@ -15,7 +15,7 @@ PRICE_USD                   = 10
 
 CHANNEL_FEATURES_ID         = 1562901227254185994
 CHANNEL_TICKETS_ID          = 1562901115803144315
-GUILD_ID                    = 1562551271792181341  # <-- METTI IL TUO GUILD ID
+GUILD_ID                    = 0  # <-- METTI IL TUO GUILD ID
 
 ALERT_EMOJI    = "<a:Alert:1562891464432943124>"
 QUESTION_EMOJI = "<:question:1562891360850284595>"
@@ -52,18 +52,22 @@ async def _open_ticket(interaction: discord.Interaction, category_id: int, kind:
     guild = interaction.guild
     user  = interaction.user
 
+    async def _reply(msg):
+        if interaction.response.is_done():
+            await interaction.edit_original_response(content=msg)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+
     existing = await _find_user_ticket(guild, user.id)
     if existing:
-        await interaction.response.send_message(
-            f"You already have an open ticket: {existing.mention}", ephemeral=True
-        )
+        await _reply(f"You already have an open ticket: {existing.mention}")
         return None
 
     category   = guild.get_channel(category_id)
     staff_role = guild.get_role(STAFF_ROLE_ID)
 
     if category is None:
-        await interaction.response.send_message("❌ Category not found.", ephemeral=True)
+        await _reply("❌ Category not found.")
         return None
 
     overwrites = {
@@ -82,7 +86,7 @@ async def _open_ticket(interaction: discord.Interaction, category_id: int, kind:
             topic=f"owner:{user.id}",
         )
     except Exception as e:
-        await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+        await _reply(f"❌ Error: {e}")
         return None
 
     return channel
@@ -141,15 +145,14 @@ class PurchaseButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.send_message("Opening your ticket...", ephemeral=True)
         channel = await _open_ticket(interaction, TICKET_PURCHASE_CATEGORY_ID, "purchase")
         if channel is None:
             return
         ltc     = await _usd_to_ltc(PRICE_USD)
         ltc_str = f"{ltc} LTC" if ltc else "Ask staff (rate unavailable)"
-        view = PurchaseTicketView(ltc_str)
-        await channel.send(view=view)
-        await interaction.followup.send(f"✅ Ticket opened: {channel.mention}", ephemeral=True)
+        await channel.send(view=PurchaseTicketView(ltc_str))
+        await interaction.edit_original_response(content=f"✅ Ticket opened: {channel.mention}")
 
 
 class SupportButton(discord.ui.Button):
@@ -162,13 +165,12 @@ class SupportButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.send_message("Opening your ticket...", ephemeral=True)
         channel = await _open_ticket(interaction, TICKET_SUPPORT_CATEGORY_ID, "support")
         if channel is None:
             return
-        view = SupportTicketView()
-        await channel.send(view=view)
-        await interaction.followup.send(f"✅ Ticket opened: {channel.mention}", ephemeral=True)
+        await channel.send(view=SupportTicketView())
+        await interaction.edit_original_response(content=f"✅ Ticket opened: {channel.mention}")
 
 # ── TICKET VIEWS ──────────────────────────────────────────────────────────────
 class SupportTicketView(discord.ui.LayoutView):
