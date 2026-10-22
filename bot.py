@@ -4,7 +4,8 @@ import discord
 from discord.ext import commands
 
 # ── TOKEN ────────────────────────────────────────────────────────────────────
-TOKEN = "IL_TUO_TOKEN"
+import os
+TOKEN = os.getenv("TOKEN")
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 TICKET_PANEL_CHANNEL_ID     = 1537932706506215434
