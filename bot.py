@@ -13,6 +13,10 @@ STAFF_ROLE_ID               = 1562900424233848852
 LTC_ADDRESS                 = "LZnytAtTzjGqUeLWHpkvhkK2U8z5f5fov5"
 PRICE_USD                   = 10
 
+CHANNEL_FEATURES_ID         = 1562901227254185994
+CHANNEL_TICKETS_ID          = 1562901115803144315
+GUILD_ID                    = 0  # <-- METTI IL TUO GUILD ID
+
 ALERT_EMOJI    = "<a:Alert:1562891464432943124>"
 QUESTION_EMOJI = "<:question:1562891360850284595>"
 WARN_EMOJI     = "<a:warnings:1562891301760802938>"
@@ -36,7 +40,7 @@ async def _usd_to_ltc(usd: float):
     except Exception:
         return None
 
-# ── TICKET HELPERS ────────────────────────────────────────────────────────────
+# ── TICKET HELPERS ─────────────────────────────────────────────────────────────
 async def _find_user_ticket(guild, user_id: int):
     for ch in guild.text_channels:
         if ch.category_id in {TICKET_SUPPORT_CATEGORY_ID, TICKET_PURCHASE_CATEGORY_ID}:
@@ -83,7 +87,7 @@ async def _open_ticket(interaction: discord.Interaction, category_id: int, kind:
 
     return channel
 
-# ── PING STAFF BUTTON (one-time) ──────────────────────────────────────────────
+# ── BUTTONS ───────────────────────────────────────────────────────────────────
 class PingStaffButton(discord.ui.Button):
     def __init__(self):
         super().__init__(
@@ -94,7 +98,6 @@ class PingStaffButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # disable the button after first press
         self.disabled = True
         self.label = "Staff Pinged"
         await interaction.response.edit_message(view=self.view)
@@ -103,7 +106,7 @@ class PingStaffButton(discord.ui.Button):
             allowed_mentions=discord.AllowedMentions(roles=True),
         )
 
-# ── CLOSE BUTTON ──────────────────────────────────────────────────────────────
+
 class CloseTicketButton(discord.ui.Button):
     def __init__(self):
         super().__init__(
@@ -114,26 +117,60 @@ class CloseTicketButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            description=f"{WARN_EMOJI} **Ticket closed.**\nThis channel will be deleted in 5 seconds.",
-            color=WHITE,
-        )
-        await interaction.response.send_message(embed=embed)
+        c = discord.ui.Container(accent_colour=WHITE)
+        c.add_item(discord.ui.TextDisplay(
+            f"{WARN_EMOJI} **Ticket closed.**\nThis channel will be deleted in 5 seconds."
+        ))
+        view = discord.ui.LayoutView(timeout=None)
+        view.add_item(c)
+        await interaction.response.send_message(view=view)
         await asyncio.sleep(5)
         try:
             await interaction.channel.delete()
         except Exception:
             pass
 
-# ── TICKET CONTENT VIEWS ──────────────────────────────────────────────────────
-class TicketControlView(discord.ui.View):
-    """Persistent view with Ping Staff (one-time) + Close Ticket."""
+
+class PurchaseButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(PingStaffButton())
-        self.add_item(CloseTicketButton())
+        super().__init__(
+            label="Purchase",
+            style=discord.ButtonStyle.success,
+            emoji=discord.PartialEmoji.from_str(MONEY_EMOJI),
+            custom_id="snap:purchase",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        channel = await _open_ticket(interaction, TICKET_PURCHASE_CATEGORY_ID, "purchase")
+        if channel is None:
+            return
+        ltc     = await _usd_to_ltc(PRICE_USD)
+        ltc_str = f"{ltc} LTC" if ltc else "Ask staff (rate unavailable)"
+        view = PurchaseTicketView(ltc_str)
+        await channel.send(view=view)
+        await interaction.followup.send(f"✅ Ticket opened: {channel.mention}", ephemeral=True)
 
 
+class SupportButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Support",
+            style=discord.ButtonStyle.secondary,
+            emoji=discord.PartialEmoji.from_str(GUIDE_EMOJI),
+            custom_id="snap:support",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        channel = await _open_ticket(interaction, TICKET_SUPPORT_CATEGORY_ID, "support")
+        if channel is None:
+            return
+        view = SupportTicketView()
+        await channel.send(view=view)
+        await interaction.followup.send(f"✅ Ticket opened: {channel.mention}", ephemeral=True)
+
+# ── TICKET VIEWS ──────────────────────────────────────────────────────────────
 class SupportTicketView(discord.ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
@@ -141,7 +178,7 @@ class SupportTicketView(discord.ui.LayoutView):
         c.add_item(discord.ui.TextDisplay(
             f"# {GUIDE_EMOJI} Support Ticket\n"
             f"Welcome! A staff member will be with you shortly.\n\n"
-            f"Describe your issue below and press **Ping Staff** when you're ready."
+            f"Describe your issue below, then press **Ping Staff** when ready."
         ))
         c.add_item(discord.ui.Separator())
         c.add_item(discord.ui.ActionRow(PingStaffButton(), CloseTicketButton()))
@@ -165,60 +202,47 @@ class PurchaseTicketView(discord.ui.LayoutView):
         c.add_item(discord.ui.ActionRow(PingStaffButton(), CloseTicketButton()))
         self.add_item(c)
 
-# ── PANEL BUTTONS ─────────────────────────────────────────────────────────────
-class PurchaseButton(discord.ui.Button):
-    def __init__(self):
-        super().__init__(
-            label="Purchase",
-            style=discord.ButtonStyle.success,
-            emoji=discord.PartialEmoji.from_str(MONEY_EMOJI),
-            custom_id="snap:purchase",
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        channel = await _open_ticket(interaction, TICKET_PURCHASE_CATEGORY_ID, "purchase")
-        if channel is None:
-            return
-        ltc     = await _usd_to_ltc(PRICE_USD)
-        ltc_str = f"{ltc} LTC" if ltc else "Ask staff (rate unavailable)"
-        await channel.send(view=PurchaseTicketView(ltc_str))
-        await interaction.followup.send(
-            f"✅ Ticket opened: {channel.mention}", ephemeral=True
-        )
-
-
-class SupportButton(discord.ui.Button):
-    def __init__(self):
-        super().__init__(
-            label="Support",
-            style=discord.ButtonStyle.secondary,
-            emoji=discord.PartialEmoji.from_str(GUIDE_EMOJI),
-            custom_id="snap:support",
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        channel = await _open_ticket(interaction, TICKET_SUPPORT_CATEGORY_ID, "support")
-        if channel is None:
-            return
-        await channel.send(view=SupportTicketView())
-        await interaction.followup.send(
-            f"✅ Ticket opened: {channel.mention}", ephemeral=True
-        )
-
-
+# ── PANEL VIEW ────────────────────────────────────────────────────────────────
 class TicketPanelView(discord.ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
             f"# {TICKET_EMOJI} Support Tickets\n"
-            f"Need help or want to get access? Open a ticket below and our team will assist you.\n\n"
-            f"{MONEY_EMOJI} **Purchase** — Get Premium Access for **$10** (paid via Litecoin).\n"
+            f"Need help or want to get access? Open a ticket and our team will assist you.\n\n"
+            f"{MONEY_EMOJI} **Purchase** — Get Premium Access for **$10** via Litecoin.\n"
             f"{GUIDE_EMOJI} **Support** — Have a question or issue? We're here to help."
         ))
         c.add_item(discord.ui.Separator())
         c.add_item(discord.ui.ActionRow(PurchaseButton(), SupportButton()))
         self.add_item(c)
+
+# ── WELCOME VIEW (V2) ─────────────────────────────────────────────────────────
+def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
+    guild_id = member.guild.id
+    view = discord.ui.LayoutView(timeout=None)
+    c = discord.ui.Container(accent_colour=WHITE)
+    c.add_item(discord.ui.TextDisplay(
+        f"# {ALERT_EMOJI} Welcome, {member.mention}!\n"
+        f"Glad to have you in **{member.guild.name}**. Check out the channels below to get started."
+    ))
+    c.add_item(discord.ui.Separator())
+    c.add_item(discord.ui.ActionRow(
+        discord.ui.Button(
+            label="Premium Features",
+            style=discord.ButtonStyle.link,
+            emoji=discord.PartialEmoji.from_str(MONEY_EMOJI),
+            url=f"https://discord.com/channels/{guild_id}/{CHANNEL_FEATURES_ID}",
+        ),
+        discord.ui.Button(
+            label="Open a Ticket",
+            style=discord.ButtonStyle.link,
+            emoji=discord.PartialEmoji.from_str(TICKET_EMOJI),
+            url=f"https://discord.com/channels/{guild_id}/{CHANNEL_TICKETS_ID}",
+        ),
+    ))
+    view.add_item(c)
+    return view
 
 # ── BOT ───────────────────────────────────────────────────────────────────────
 intents = discord.Intents.default()
@@ -231,7 +255,7 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 async def on_ready():
     bot.add_view(TicketPanelView())
     bot.add_view(SupportTicketView())
-    bot.add_view(TicketControlView())
+    bot.add_view(PurchaseTicketView(""))
     for g in bot.guilds:
         bot.tree.copy_global_to(guild=g)
         await bot.tree.sync(guild=g)
@@ -242,17 +266,10 @@ async def on_member_join(member: discord.Member):
     ch = bot.get_channel(WELCOME_CHANNEL_ID)
     if ch is None:
         return
-    embed = discord.Embed(
-        description=(
-            f"Hey {member.mention}, welcome to **{member.guild.name}**! {ALERT_EMOJI}\n"
-            f"Make sure to check the rules and enjoy your stay."
-        ),
-        color=WHITE,
+    await ch.send(
+        view=_welcome_view(member),
+        allowed_mentions=discord.AllowedMentions(users=True),
     )
-    embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text=f"Member #{member.guild.member_count}")
-    await ch.send(embed=embed)
 
 @bot.command(name="ticket")
 async def ticket_panel_cmd(ctx):
