@@ -36,7 +36,12 @@ TICKET_EMOJI   = "<:ticket:1562891010999062739>"
 DOWNLOAD_EMOJI = "<:download_discord:1563225797144350790>"
 WINDOWS_EMOJI  = "<:windows:1563221221196300318>"
 LINUX_EMOJI    = "<:linux:1563221292151480320>"
-FOLDER_EMOJI   = "<:femboy:1563225407409361047>"  # non mi hai dato questa, sostituiscila tu
+FOLDER_EMOJI   = "<:femboy:1563225407409361047>"
+LOADING_EMOJI  = "<a:loading:1563226245557387324>"
+
+# Immagine mostrata nell'embed del pannello !freeaccesspanel.
+# Metti il file "free_builder_banner.png" nella STESSA cartella di bot.py.
+FREE_BUILDER_IMAGE_FILENAME = "free_builder_banner.png"
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
@@ -179,7 +184,7 @@ class CloseTicketButton(discord.ui.Button):
         try:
             c = discord.ui.Container(accent_colour=WHITE)
             c.add_item(discord.ui.TextDisplay(
-                f"{WARN_EMOJI} **Ticket closed.**\nThis channel will be deleted in 5 seconds."
+                f"{LOADING_EMOJI} **Closing ticket...**\nThis channel will be deleted in 5 seconds."
             ))
             view = discord.ui.LayoutView(timeout=None)
             view.add_item(c)
@@ -202,7 +207,7 @@ class PurchaseButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         # ACK FIRST — deve sempre avvenire entro 3s, qualunque cosa succeda.
         try:
-            await interaction.response.send_message(f"{TICKET_EMOJI} Opening your ticket...", ephemeral=True)
+            await interaction.response.send_message(f"{LOADING_EMOJI} Opening your ticket...", ephemeral=True)
         except Exception:
             traceback.print_exc()
             return
@@ -239,7 +244,7 @@ class SupportButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            await interaction.response.send_message(f"{TICKET_EMOJI} Opening your ticket...", ephemeral=True)
+            await interaction.response.send_message(f"{LOADING_EMOJI} Opening your ticket...", ephemeral=True)
         except Exception:
             traceback.print_exc()
             return
@@ -441,7 +446,7 @@ class OSSelect(discord.ui.Select):
 
             c = discord.ui.Container(accent_colour=WHITE)
             c.add_item(discord.ui.TextDisplay(
-                f"# {FOLDER_EMOJI}  Here is your file for {label}\n"
+                f"# {FOLDER_EMOJI} Here is your file for {label}\n"
                 f"-# {emoji}  Builder — {label} edition"
             ))
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
@@ -464,7 +469,7 @@ class OSSelectView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI}  Femboy Builder\n"
+            f"# {FOLDER_EMOJI} Femboy Builder\n"
             f"Select your Operating System"
         ))
         c.add_item(discord.ui.Separator())
@@ -491,22 +496,24 @@ class FreeAccessDownloadButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        # ACK FIRST con un messaggio di "loading", poi aggiorno il risultato.
+        try:
+            await interaction.response.send_message(f"{LOADING_EMOJI} Sending in dms...", ephemeral=True)
+        except Exception:
+            traceback.print_exc()
+            return
+
         try:
             await interaction.user.send(view=OSSelectView())
-            await interaction.response.send_message(
-                f"{DOWNLOAD_EMOJI} Check your DMs!", ephemeral=True
-            )
+            await interaction.edit_original_response(content=f"{DOWNLOAD_EMOJI} Check your DMs!")
         except discord.Forbidden:
-            await interaction.response.send_message(
-                f"{WARN_EMOJI} I can't DM you — please enable DMs from server members and try again.",
-                ephemeral=True,
+            await interaction.edit_original_response(
+                content=f"{WARN_EMOJI} I can't DM you — please enable DMs from server members and try again."
             )
         except Exception as e:
             traceback.print_exc()
             try:
-                await interaction.response.send_message(
-                    f"{WARN_EMOJI} Something went wrong: {e}", ephemeral=True
-                )
+                await interaction.edit_original_response(content=f"{WARN_EMOJI} Something went wrong: {e}")
             except Exception:
                 pass
 
@@ -516,9 +523,12 @@ class FreeAccessPanelView(BaseView):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI}  Free Builder\n"
-            f"Press the button below to get access to free builder "
-            f"(guide will get sent in dm with builder download)"
+            f"# {FOLDER_EMOJI} Free Builder\n"
+            f"Press the button below to get **access to the free builder**.\n"
+            f"-# A **setup guide** will be sent to your DMs together with the **download**."
+        ))
+        c.add_item(discord.ui.MediaGallery(
+            discord.MediaGalleryItem(media=f"attachment://{FREE_BUILDER_IMAGE_FILENAME}")
         ))
         c.add_item(discord.ui.Separator())
         c.add_item(discord.ui.ActionRow(
@@ -609,7 +619,10 @@ async def free_access_panel_cmd(ctx):
                 await m.delete()
     except Exception:
         pass
-    await ctx.channel.send(view=FreeAccessPanelView())
+
+    image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), FREE_BUILDER_IMAGE_FILENAME)
+    file = discord.File(image_path, filename=FREE_BUILDER_IMAGE_FILENAME)
+    await ctx.channel.send(view=FreeAccessPanelView(), file=file)
     try:
         await ctx.message.delete()
     except Exception:
