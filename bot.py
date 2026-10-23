@@ -32,11 +32,11 @@ MONEY_EMOJI    = "<:money:1562891076006584373>"
 SHOP_EMOJI     = "<a:shopping:1562891221423104072>"
 TICKET_EMOJI   = "<:ticket:1562891010999062739>"
 
-# ── NUOVE EMOJI — sostituisci con gli ID delle tue emoji custom ───────────────
-DOWNLOAD_EMOJI = "<:download:0000000000000000>"
-WINDOWS_EMOJI  = "<:windows:0000000000000000>"
-LINUX_EMOJI    = "<:linux:0000000000000000>"
-FOLDER_EMOJI   = "<:folder:0000000000000000>"
+# ── NUOVE EMOJI ─────────────────────────────────────────────────────────────
+DOWNLOAD_EMOJI = "<:download:1563221833551970354>"
+WINDOWS_EMOJI  = "<:windows:1563221221196300318>"
+LINUX_EMOJI    = "<:linux:1563221292151480320>"
+FOLDER_EMOJI   = "<:folder:0000000000000000>"  # non mi hai dato questa, sostituiscila tu
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
@@ -469,6 +469,14 @@ class OSSelectView(discord.ui.LayoutView):
         ))
         c.add_item(discord.ui.Separator())
         c.add_item(discord.ui.ActionRow(OSSelect()))
+        c.add_item(discord.ui.ActionRow(
+            discord.ui.Button(
+                label="Tutorial",
+                style=discord.ButtonStyle.link,
+                emoji=discord.PartialEmoji.from_str(GUIDE_EMOJI),
+                url=TUTORIAL_URL,
+            ),
+        ))
         self.add_item(c)
 
 
