@@ -19,7 +19,7 @@ CHANNEL_TICKETS_ID          = 1562901115803144315
 GUILD_ID                    = 0  # non usato
 
 # Link del pulsante "Premium Features" sotto il pannello !ticket
-PREMIUM_FEATURES_URL = "https://discord.com/channels/1562551271792181341/1562901115803144315"
+PREMIUM_FEATURES_URL = "https://discord.com/channels/1562551271792181341/1562901227254185994"
 
 ALERT_EMOJI    = "<a:Alert:1562891464432943124>"
 QUESTION_EMOJI = "<:question:1562891360850284595>"
