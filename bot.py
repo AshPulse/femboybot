@@ -16,7 +16,10 @@ PRICE_USD                   = 10
 
 CHANNEL_FEATURES_ID         = 1562901227254185994
 CHANNEL_TICKETS_ID          = 1562901115803144315
-GUILD_ID                    = 1562551271792181341  # non usato
+GUILD_ID                    = 0  # non usato
+
+# Link del pulsante "Premium Features" sotto il pannello !ticket
+PREMIUM_FEATURES_URL = "https://discord.com/channels/1562551271792181341/1562901115803144315"
 
 ALERT_EMOJI    = "<a:Alert:1562891464432943124>"
 QUESTION_EMOJI = "<:question:1562891360850284595>"
@@ -45,8 +48,7 @@ async def _usd_to_ltc(usd: float):
 
 # ── TICKET HELPERS ────────────────────────────────────────────────────────────
 # Il topic del canale contiene:  owner:<id>   oppure   owner:<id>|ltc:<importo>
-# L'importo LTC viene salvato nel topic così anche dopo un riavvio del bot
-# il messaggio non perde il valore (prima tornava "...").
+# Così dopo un riavvio del bot i messaggi dei ticket si ricostruiscono giusti.
 def _topic_owner(topic: str):
     return (topic or "").split("|")[0]
 
@@ -55,6 +57,13 @@ def _ltc_from_topic(topic: str) -> str:
     if topic and "|ltc:" in topic:
         return topic.split("|ltc:", 1)[1]
     return ""
+
+
+def _owner_id_from_topic(topic: str):
+    try:
+        return int(_topic_owner(topic).split(":", 1)[1])
+    except Exception:
+        return None
 
 
 async def _find_user_ticket(guild: discord.Guild, user_id: int):
@@ -73,7 +82,7 @@ async def _create_ticket_channel(interaction: discord.Interaction, category_id: 
 
     existing = await _find_user_ticket(guild, user.id)
     if existing:
-        return None, f"You already have an open ticket: {existing.mention}"
+        return None, f"{ALERT_EMOJI} You already have an open ticket: {existing.mention}"
 
     category = guild.get_channel(category_id)
     if category is None:
@@ -82,11 +91,11 @@ async def _create_ticket_channel(interaction: discord.Interaction, category_id: 
         except Exception:
             category = None
     if category is None:
-        return None, "❌ Ticket category not found (check the category ID in the config)."
+        return None, f"{WARN_EMOJI} Ticket category not found (check the category ID in the config)."
 
     me = guild.me
     if not category.permissions_for(me).manage_channels:
-        return None, "❌ I don't have **Manage Channels** permission in that category."
+        return None, f"{WARN_EMOJI} I don't have **Manage Channels** permission in that category."
 
     staff_role = guild.get_role(STAFF_ROLE_ID)
     overwrites = {
@@ -129,13 +138,15 @@ class PingStaffButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            channel = interaction.channel
+            channel  = interaction.channel
+            owner_id = _owner_id_from_topic(channel.topic)
+
             # Ricostruisco la view giusta in base alla categoria del ticket
             # (funziona anche dopo un riavvio del bot).
             if getattr(channel, "category_id", None) == TICKET_PURCHASE_CATEGORY_ID:
-                new_view = PurchaseTicketView(_ltc_from_topic(channel.topic), pinged=True)
+                new_view = PurchaseTicketView(_ltc_from_topic(channel.topic), pinged=True, owner_id=owner_id)
             else:
-                new_view = SupportTicketView(pinged=True)
+                new_view = SupportTicketView(pinged=True, owner_id=owner_id)
 
             await interaction.response.edit_message(view=new_view)
             await channel.send(
@@ -182,7 +193,7 @@ class PurchaseButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         # ACK FIRST — deve sempre avvenire entro 3s, qualunque cosa succeda.
         try:
-            await interaction.response.send_message("⏳ Opening your ticket...", ephemeral=True)
+            await interaction.response.send_message(f"{TICKET_EMOJI} Opening your ticket...", ephemeral=True)
         except Exception:
             traceback.print_exc()
             return
@@ -198,12 +209,12 @@ class PurchaseButton(discord.ui.Button):
                 await interaction.edit_original_response(content=err)
                 return
 
-            await channel.send(view=PurchaseTicketView(ltc_str))
-            await interaction.edit_original_response(content=f"✅ Ticket opened: {channel.mention}")
+            await channel.send(view=PurchaseTicketView(ltc_str, owner_id=interaction.user.id))
+            await interaction.edit_original_response(content=f"{TICKET_EMOJI} Ticket opened: {channel.mention}")
         except Exception as e:
             traceback.print_exc()
             try:
-                await interaction.edit_original_response(content=f"❌ Something went wrong: {e}")
+                await interaction.edit_original_response(content=f"{WARN_EMOJI} Something went wrong: {e}")
             except Exception:
                 pass
 
@@ -219,7 +230,7 @@ class SupportButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            await interaction.response.send_message("⏳ Opening your ticket...", ephemeral=True)
+            await interaction.response.send_message(f"{TICKET_EMOJI} Opening your ticket...", ephemeral=True)
         except Exception:
             traceback.print_exc()
             return
@@ -232,45 +243,72 @@ class SupportButton(discord.ui.Button):
                 await interaction.edit_original_response(content=err)
                 return
 
-            await channel.send(view=SupportTicketView())
-            await interaction.edit_original_response(content=f"✅ Ticket opened: {channel.mention}")
+            await channel.send(view=SupportTicketView(owner_id=interaction.user.id))
+            await interaction.edit_original_response(content=f"{TICKET_EMOJI} Ticket opened: {channel.mention}")
         except Exception as e:
             traceback.print_exc()
             try:
-                await interaction.edit_original_response(content=f"❌ Something went wrong: {e}")
+                await interaction.edit_original_response(content=f"{WARN_EMOJI} Something went wrong: {e}")
             except Exception:
                 pass
 
 
 # ── TICKET VIEWS (persistent — timeout=None) ──────────────────────────────────
 class SupportTicketView(BaseView):
-    def __init__(self, pinged: bool = False):
+    def __init__(self, pinged: bool = False, owner_id: int = None):
         super().__init__(timeout=None)
+        greet = f"Welcome <@{owner_id}>! Thanks for reaching out." if owner_id else "Welcome! Thanks for reaching out."
+
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
             f"# {GUIDE_EMOJI} Support Ticket\n"
-            f"Welcome! A staff member will be with you shortly.\n\n"
-            f"Describe your issue below, then press **Ping Staff** when ready."
+            f"-# Our team will be with you shortly"
         ))
-        c.add_item(discord.ui.Separator())
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.TextDisplay(
+            f"{greet}\n"
+            f"A staff member will reply as soon as possible."
+        ))
+        c.add_item(discord.ui.TextDisplay(
+            f"**How to get help faster**\n"
+            f"{QUESTION_EMOJI}  Describe your issue with as much detail as you can\n"
+            f"{GUIDE_EMOJI}  Add screenshots or any useful info\n"
+            f"{ALERT_EMOJI}  Press **Ping Staff** only when you're ready"
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
         c.add_item(discord.ui.ActionRow(PingStaffButton(pinged), CloseTicketButton()))
         self.add_item(c)
 
 
 class PurchaseTicketView(BaseView):
-    def __init__(self, ltc_str: str = "", pinged: bool = False):
+    def __init__(self, ltc_str: str = "", pinged: bool = False, owner_id: int = None):
         super().__init__(timeout=None)
+        greet = f"Welcome <@{owner_id}>! " if owner_id else ""
+
         c = discord.ui.Container(accent_colour=YELLOW)
         c.add_item(discord.ui.TextDisplay(
             f"# {SHOP_EMOJI} Purchase — Premium Access\n"
-            f"Send the exact amount to the address below to complete your purchase.\n\n"
-            f"{WARN_EMOJI} **Do NOT pay any staff member. Only use this address.**\n\n"
-            f"**Plan**\n```Premium Access — ${PRICE_USD} USD```\n"
-            f"**LTC Amount**\n```{ltc_str or '...'}```\n"
-            f"**Payment Address**\n```{LTC_ADDRESS}```\n\n"
-            f"Once your payment is confirmed, staff will grant you access."
+            f"-# Pay with Litecoin (LTC) · Access is granted after confirmation"
         ))
-        c.add_item(discord.ui.Separator())
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.TextDisplay(
+            f"{greet}Send the exact amount to the address below to complete your purchase."
+        ))
+        c.add_item(discord.ui.TextDisplay(
+            f"**{MONEY_EMOJI} Plan**\n```Premium Access — ${PRICE_USD} USD```"
+        ))
+        c.add_item(discord.ui.TextDisplay(
+            f"**{MONEY_EMOJI} LTC Amount**\n```{ltc_str or '...'}```"
+        ))
+        c.add_item(discord.ui.TextDisplay(
+            f"**{MONEY_EMOJI} Payment Address**\n```{LTC_ADDRESS}```"
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.TextDisplay(
+            f"{WARN_EMOJI} **Do NOT pay any staff member. Only use this address.**\n"
+            f"-# Once your payment is confirmed, staff will grant you access."
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
         c.add_item(discord.ui.ActionRow(PingStaffButton(pinged), CloseTicketButton()))
         self.add_item(c)
 
@@ -288,6 +326,27 @@ class TicketPanelView(BaseView):
         ))
         c.add_item(discord.ui.Separator())
         c.add_item(discord.ui.ActionRow(PurchaseButton(), SupportButton()))
+        self.add_item(c)
+
+
+# ── PREMIUM FEATURES EMBED (sotto il pannello, solo link button) ──────────────
+class PremiumFeaturesView(discord.ui.LayoutView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        c = discord.ui.Container(accent_colour=WHITE)
+        c.add_item(discord.ui.TextDisplay(
+            f"# {SHOP_EMOJI} Premium Features\n"
+            f"Curious about what Premium Access includes? Check out every feature before you buy."
+        ))
+        c.add_item(discord.ui.Separator())
+        c.add_item(discord.ui.ActionRow(
+            discord.ui.Button(
+                label="Premium Features",
+                style=discord.ButtonStyle.link,
+                emoji=discord.PartialEmoji.from_str(MONEY_EMOJI),
+                url=PREMIUM_FEATURES_URL,
+            ),
+        ))
         self.add_item(c)
 
 
@@ -345,8 +404,7 @@ async def on_ready():
 
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
-    # Solo log di debug: se premi un pulsante e qui non stampa nulla,
-    # il click non arriva a questo processo (altra istanza / token diverso).
+    # Solo log di debug: mostra ogni click sui pulsanti in console.
     if interaction.type == discord.InteractionType.component:
         cid = (interaction.data or {}).get("custom_id")
         print(f"[CLICK] {interaction.user} -> {cid}")
@@ -366,119 +424,6 @@ async def on_member_join(member: discord.Member):
         traceback.print_exc()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ██ TEST TEMPORANEO — RIMUOVERE DOPO IL TEST (tutto fino a "FINE TEST") ██
-# ══════════════════════════════════════════════════════════════════════════════
-def _test_view(text: str) -> discord.ui.LayoutView:
-    v = discord.ui.LayoutView(timeout=None)
-    c = discord.ui.Container(accent_colour=WHITE)
-    c.add_item(discord.ui.TextDisplay(text))
-    v.add_item(c)
-    return v
-
-
-class TestButton(discord.ui.Button):
-    def __init__(self):
-        super().__init__(
-            label="Test",
-            style=discord.ButtonStyle.success,
-            emoji=discord.PartialEmoji.from_str(TICKET_EMOJI),
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        print(f"[TEST] callback ricevuto da {interaction.user}")
-
-        # ACK subito
-        try:
-            await interaction.response.send_message(
-                "⏳ Callback ricevuto, eseguo i test...", ephemeral=True
-            )
-        except Exception:
-            traceback.print_exc()
-            return
-
-        results = ["✅ Callback ricevuto"]
-        guild = interaction.guild
-        user  = interaction.user
-
-        # 1) messaggio nello STESSO canale
-        try:
-            await interaction.channel.send(
-                view=_test_view(f"{WARN_EMOJI} **Test OK** — messaggio nello stesso canale ({user.mention})")
-            )
-            results.append("✅ Messaggio nello stesso canale")
-        except Exception as e:
-            traceback.print_exc()
-            results.append(f"❌ Stesso canale: {e}")
-
-        # 2) messaggio nel canale WELCOME / JOINS
-        try:
-            ch = bot.get_channel(WELCOME_CHANNEL_ID) or await bot.fetch_channel(WELCOME_CHANNEL_ID)
-            await ch.send(
-                view=_test_view(f"{ALERT_EMOJI} **Test OK** — messaggio nel canale welcome/joins ({user.mention})")
-            )
-            results.append("✅ Messaggio nel canale welcome/joins")
-        except Exception as e:
-            traceback.print_exc()
-            results.append(f"❌ Welcome/joins: {e}")
-
-        # 3) apre un canale in OGNI categoria (support + purchase)
-        staff_role = guild.get_role(STAFF_ROLE_ID)
-        for label, cat_id, kind in (
-            ("Support",  TICKET_SUPPORT_CATEGORY_ID,  "support"),
-            ("Purchase", TICKET_PURCHASE_CATEGORY_ID, "purchase"),
-        ):
-            try:
-                category = guild.get_channel(cat_id) or await guild.fetch_channel(cat_id)
-                overwrites = {
-                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                    user:     discord.PermissionOverwrite(view_channel=True, send_messages=True),
-                    guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-                }
-                if staff_role:
-                    overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
-
-                new_ch = await guild.create_text_channel(
-                    f"test-{kind}-{user.name}",
-                    category=category,
-                    overwrites=overwrites,
-                    topic="test",
-                )
-                await new_ch.send(
-                    view=_test_view(f"{GUIDE_EMOJI} **Test OK** — canale {label} creato per {user.mention}")
-                )
-                results.append(f"✅ Canale {label}: {new_ch.mention}")
-            except Exception as e:
-                traceback.print_exc()
-                results.append(f"❌ Canale {label}: {e}")
-
-        try:
-            await interaction.edit_original_response(content="\n".join(results))
-        except Exception:
-            traceback.print_exc()
-
-
-@bot.command(name="botton")
-async def botton_cmd(ctx):
-    if not ctx.author.guild_permissions.administrator:
-        return
-    view = BaseView(timeout=None)
-    c = discord.ui.Container(accent_colour=WHITE)
-    c.add_item(discord.ui.TextDisplay(
-        f"# {TICKET_EMOJI} Test Button\n"
-        f"Premi il pulsante per testare callback, messaggi e creazione canali."
-    ))
-    c.add_item(discord.ui.Separator())
-    c.add_item(discord.ui.ActionRow(TestButton()))
-    view.add_item(c)
-    await ctx.channel.send(view=view)
-    try:
-        await ctx.message.delete()
-    except Exception:
-        pass
-# ══════════════════════════════ FINE TEST ═════════════════════════════════════
-
-
 @bot.command(name="ticket")
 async def ticket_panel_cmd(ctx):
     if not ctx.author.guild_permissions.administrator:
@@ -490,6 +435,7 @@ async def ticket_panel_cmd(ctx):
     except Exception:
         pass
     await ctx.channel.send(view=TicketPanelView())
+    await ctx.channel.send(view=PremiumFeaturesView())
     try:
         await ctx.message.delete()
     except Exception:
