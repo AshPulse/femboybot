@@ -8,15 +8,15 @@ from discord.ext import commands
 TOKEN = os.getenv("TOKEN", "IL_TUO_TOKEN")
 
 WELCOME_CHANNEL_ID          = 1562890044455526551
-TICKET_SUPPORT_CATEGORY_ID  = 1562900594367270963
-TICKET_PURCHASE_CATEGORY_ID = 1562900617385480212
+TICKET_SUPPORT_CATEGORY_ID  = 1562900594367270963   # SUPPORT TICKETS
+TICKET_PURCHASE_CATEGORY_ID = 1562900617385480212   # PURCHASE TICKETS
 STAFF_ROLE_ID               = 1562900424233848852
 LTC_ADDRESS                 = "LZnytAtTzjGqUeLWHpkvhkK2U8z5f5fov5"
 PRICE_USD                   = 10
 
 CHANNEL_FEATURES_ID         = 1562901227254185994
 CHANNEL_TICKETS_ID          = 1562901115803144315
-GUILD_ID                    = 0  # <-- METTI IL TUO GUILD ID
+GUILD_ID                    = 0  # non usato
 
 ALERT_EMOJI    = "<a:Alert:1562891464432943124>"
 QUESTION_EMOJI = "<:question:1562891360850284595>"
@@ -28,6 +28,7 @@ TICKET_EMOJI   = "<:ticket:1562891010999062739>"
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
+
 
 # ── LTC ───────────────────────────────────────────────────────────────────────
 async def _usd_to_ltc(usd: float):
@@ -41,16 +42,31 @@ async def _usd_to_ltc(usd: float):
     except Exception:
         return None
 
-# ── TICKET HELPERS ─────────────────────────────────────────────────────────────
-async def _find_user_ticket(guild, user_id: int):
+
+# ── TICKET HELPERS ────────────────────────────────────────────────────────────
+# Il topic del canale contiene:  owner:<id>   oppure   owner:<id>|ltc:<importo>
+# L'importo LTC viene salvato nel topic così anche dopo un riavvio del bot
+# il messaggio non perde il valore (prima tornava "...").
+def _topic_owner(topic: str):
+    return (topic or "").split("|")[0]
+
+
+def _ltc_from_topic(topic: str) -> str:
+    if topic and "|ltc:" in topic:
+        return topic.split("|ltc:", 1)[1]
+    return ""
+
+
+async def _find_user_ticket(guild: discord.Guild, user_id: int):
     for ch in guild.text_channels:
         if ch.category_id in {TICKET_SUPPORT_CATEGORY_ID, TICKET_PURCHASE_CATEGORY_ID}:
-            if f"owner:{user_id}" in (ch.topic or ""):
+            if _topic_owner(ch.topic) == f"owner:{user_id}":
                 return ch
     return None
 
 
-async def _create_ticket_channel(interaction: discord.Interaction, category_id: int, kind: str):
+async def _create_ticket_channel(interaction: discord.Interaction, category_id: int,
+                                 kind: str, ltc_str: str = ""):
     """Returns (channel, error_message). Does NOT touch the interaction response."""
     guild = interaction.guild
     user  = interaction.user
@@ -60,6 +76,11 @@ async def _create_ticket_channel(interaction: discord.Interaction, category_id: 
         return None, f"You already have an open ticket: {existing.mention}"
 
     category = guild.get_channel(category_id)
+    if category is None:
+        try:
+            category = await guild.fetch_channel(category_id)
+        except Exception:
+            category = None
     if category is None:
         return None, "❌ Ticket category not found (check the category ID in the config)."
 
@@ -76,30 +97,48 @@ async def _create_ticket_channel(interaction: discord.Interaction, category_id: 
     if staff_role:
         overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
+    topic = f"owner:{user.id}"
+    if ltc_str:
+        topic += f"|ltc:{ltc_str}"
+
     channel = await guild.create_text_channel(
         f"{kind}-{user.name}",
         category=category,
         overwrites=overwrites,
-        topic=f"owner:{user.id}",
+        topic=topic,
     )
     return channel, None
 
+
+# ── BASE VIEW (logga gli errori invece di farli sparire) ──────────────────────
+class BaseView(discord.ui.LayoutView):
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item):
+        traceback.print_exception(type(error), error, error.__traceback__)
+
+
 # ── BUTTONS ───────────────────────────────────────────────────────────────────
 class PingStaffButton(discord.ui.Button):
-    def __init__(self):
+    def __init__(self, pinged: bool = False):
         super().__init__(
-            label="Ping Staff",
+            label="Staff Pinged" if pinged else "Ping Staff",
             style=discord.ButtonStyle.secondary,
             emoji=discord.PartialEmoji.from_str(ALERT_EMOJI),
             custom_id="snap:ping_staff",
+            disabled=pinged,
         )
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            self.disabled = True
-            self.label = "Staff Pinged"
-            await interaction.response.edit_message(view=self.view)
-            await interaction.channel.send(
+            channel = interaction.channel
+            # Ricostruisco la view giusta in base alla categoria del ticket
+            # (funziona anche dopo un riavvio del bot).
+            if getattr(channel, "category_id", None) == TICKET_PURCHASE_CATEGORY_ID:
+                new_view = PurchaseTicketView(_ltc_from_topic(channel.topic), pinged=True)
+            else:
+                new_view = SupportTicketView(pinged=True)
+
+            await interaction.response.edit_message(view=new_view)
+            await channel.send(
                 content=f"<@&{STAFF_ROLE_ID}>",
                 allowed_mentions=discord.AllowedMentions(roles=True),
             )
@@ -141,7 +180,7 @@ class PurchaseButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # ACK FIRST — this must always happen within 3s, no matter what.
+        # ACK FIRST — deve sempre avvenire entro 3s, qualunque cosa succeda.
         try:
             await interaction.response.send_message("⏳ Opening your ticket...", ephemeral=True)
         except Exception:
@@ -149,13 +188,16 @@ class PurchaseButton(discord.ui.Button):
             return
 
         try:
-            channel, err = await _create_ticket_channel(interaction, TICKET_PURCHASE_CATEGORY_ID, "purchase")
+            ltc     = await _usd_to_ltc(PRICE_USD)
+            ltc_str = f"{ltc} LTC" if ltc else "Ask staff (rate unavailable)"
+
+            channel, err = await _create_ticket_channel(
+                interaction, TICKET_PURCHASE_CATEGORY_ID, "purchase", ltc_str
+            )
             if err:
                 await interaction.edit_original_response(content=err)
                 return
 
-            ltc     = await _usd_to_ltc(PRICE_USD)
-            ltc_str = f"{ltc} LTC" if ltc else "Ask staff (rate unavailable)"
             await channel.send(view=PurchaseTicketView(ltc_str))
             await interaction.edit_original_response(content=f"✅ Ticket opened: {channel.mention}")
         except Exception as e:
@@ -183,7 +225,9 @@ class SupportButton(discord.ui.Button):
             return
 
         try:
-            channel, err = await _create_ticket_channel(interaction, TICKET_SUPPORT_CATEGORY_ID, "support")
+            channel, err = await _create_ticket_channel(
+                interaction, TICKET_SUPPORT_CATEGORY_ID, "support"
+            )
             if err:
                 await interaction.edit_original_response(content=err)
                 return
@@ -197,9 +241,10 @@ class SupportButton(discord.ui.Button):
             except Exception:
                 pass
 
-# ── TICKET VIEWS (persistent forever — timeout=None) ──────────────────────────
-class SupportTicketView(discord.ui.LayoutView):
-    def __init__(self):
+
+# ── TICKET VIEWS (persistent — timeout=None) ──────────────────────────────────
+class SupportTicketView(BaseView):
+    def __init__(self, pinged: bool = False):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
@@ -208,12 +253,12 @@ class SupportTicketView(discord.ui.LayoutView):
             f"Describe your issue below, then press **Ping Staff** when ready."
         ))
         c.add_item(discord.ui.Separator())
-        c.add_item(discord.ui.ActionRow(PingStaffButton(), CloseTicketButton()))
+        c.add_item(discord.ui.ActionRow(PingStaffButton(pinged), CloseTicketButton()))
         self.add_item(c)
 
 
-class PurchaseTicketView(discord.ui.LayoutView):
-    def __init__(self, ltc_str: str = ""):
+class PurchaseTicketView(BaseView):
+    def __init__(self, ltc_str: str = "", pinged: bool = False):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=YELLOW)
         c.add_item(discord.ui.TextDisplay(
@@ -226,11 +271,12 @@ class PurchaseTicketView(discord.ui.LayoutView):
             f"Once your payment is confirmed, staff will grant you access."
         ))
         c.add_item(discord.ui.Separator())
-        c.add_item(discord.ui.ActionRow(PingStaffButton(), CloseTicketButton()))
+        c.add_item(discord.ui.ActionRow(PingStaffButton(pinged), CloseTicketButton()))
         self.add_item(c)
 
-# ── PANEL VIEW (persistent forever) ───────────────────────────────────────────
-class TicketPanelView(discord.ui.LayoutView):
+
+# ── PANEL VIEW (persistent) ───────────────────────────────────────────────────
+class TicketPanelView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
@@ -243,6 +289,7 @@ class TicketPanelView(discord.ui.LayoutView):
         c.add_item(discord.ui.Separator())
         c.add_item(discord.ui.ActionRow(PurchaseButton(), SupportButton()))
         self.add_item(c)
+
 
 # ── WELCOME VIEW (V2) ─────────────────────────────────────────────────────────
 def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
@@ -271,28 +318,39 @@ def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
     view.add_item(c)
     return view
 
+
 # ── BOT ───────────────────────────────────────────────────────────────────────
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+
+class SnapBot(commands.Bot):
+    async def setup_hook(self):
+        # Registrate UNA SOLA VOLTA, prima della connessione (on_ready può scattare più volte)
+        self.add_view(TicketPanelView())
+        self.add_view(SupportTicketView())
+        self.add_view(PurchaseTicketView())
+
+
+bot = SnapBot(command_prefix="!", intents=intents, help_command=None)
+
 
 @bot.event
 async def on_ready():
-    # register each persistent view EXACTLY ONCE — avoids any custom_id clashes
-    bot.add_view(TicketPanelView())
-    bot.add_view(SupportTicketView())
-    bot.add_view(PurchaseTicketView())
-    for g in bot.guilds:
-        try:
-            bot.tree.copy_global_to(guild=g)
-            await bot.tree.sync(guild=g)
-        except Exception:
-            traceback.print_exc()
-    print(f"Online as {bot.user}")
-    print("[!] If you deployed new code, run !ticket again to repost a FRESH panel —")
-    print("    old panel messages keep old button bindings and will not respond.")
+    print(f"Online as {bot.user} | discord.py {discord.__version__}")
+    print("[!] Se hai cambiato codice, rilancia !ticket per postare un pannello NUOVO.")
+    print("[!] Assicurati che giri UNA SOLA istanza del bot.")
+
+
+@bot.event
+async def on_interaction(interaction: discord.Interaction):
+    # Solo log di debug: se premi un pulsante e qui non stampa nulla,
+    # il click non arriva a questo processo (altra istanza / token diverso).
+    if interaction.type == discord.InteractionType.component:
+        cid = (interaction.data or {}).get("custom_id")
+        print(f"[CLICK] {interaction.user} -> {cid}")
+
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -306,6 +364,7 @@ async def on_member_join(member: discord.Member):
         )
     except Exception:
         traceback.print_exc()
+
 
 @bot.command(name="ticket")
 async def ticket_panel_cmd(ctx):
@@ -322,5 +381,6 @@ async def ticket_panel_cmd(ctx):
         await ctx.message.delete()
     except Exception:
         pass
+
 
 bot.run(TOKEN)
