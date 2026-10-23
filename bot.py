@@ -16,7 +16,7 @@ PRICE_USD                   = 10
 
 CHANNEL_FEATURES_ID         = 1562901227254185994
 CHANNEL_TICKETS_ID          = 1562901115803144315
-GUILD_ID                    = 0  # non usato
+GUILD_ID                    = 1562551271792181341  # non usato
 
 ALERT_EMOJI    = "<a:Alert:1562891464432943124>"
 QUESTION_EMOJI = "<:question:1562891360850284595>"
@@ -364,6 +364,119 @@ async def on_member_join(member: discord.Member):
         )
     except Exception:
         traceback.print_exc()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ██ TEST TEMPORANEO — RIMUOVERE DOPO IL TEST (tutto fino a "FINE TEST") ██
+# ══════════════════════════════════════════════════════════════════════════════
+def _test_view(text: str) -> discord.ui.LayoutView:
+    v = discord.ui.LayoutView(timeout=None)
+    c = discord.ui.Container(accent_colour=WHITE)
+    c.add_item(discord.ui.TextDisplay(text))
+    v.add_item(c)
+    return v
+
+
+class TestButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Test",
+            style=discord.ButtonStyle.success,
+            emoji=discord.PartialEmoji.from_str(TICKET_EMOJI),
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        print(f"[TEST] callback ricevuto da {interaction.user}")
+
+        # ACK subito
+        try:
+            await interaction.response.send_message(
+                "⏳ Callback ricevuto, eseguo i test...", ephemeral=True
+            )
+        except Exception:
+            traceback.print_exc()
+            return
+
+        results = ["✅ Callback ricevuto"]
+        guild = interaction.guild
+        user  = interaction.user
+
+        # 1) messaggio nello STESSO canale
+        try:
+            await interaction.channel.send(
+                view=_test_view(f"{WARN_EMOJI} **Test OK** — messaggio nello stesso canale ({user.mention})")
+            )
+            results.append("✅ Messaggio nello stesso canale")
+        except Exception as e:
+            traceback.print_exc()
+            results.append(f"❌ Stesso canale: {e}")
+
+        # 2) messaggio nel canale WELCOME / JOINS
+        try:
+            ch = bot.get_channel(WELCOME_CHANNEL_ID) or await bot.fetch_channel(WELCOME_CHANNEL_ID)
+            await ch.send(
+                view=_test_view(f"{ALERT_EMOJI} **Test OK** — messaggio nel canale welcome/joins ({user.mention})")
+            )
+            results.append("✅ Messaggio nel canale welcome/joins")
+        except Exception as e:
+            traceback.print_exc()
+            results.append(f"❌ Welcome/joins: {e}")
+
+        # 3) apre un canale in OGNI categoria (support + purchase)
+        staff_role = guild.get_role(STAFF_ROLE_ID)
+        for label, cat_id, kind in (
+            ("Support",  TICKET_SUPPORT_CATEGORY_ID,  "support"),
+            ("Purchase", TICKET_PURCHASE_CATEGORY_ID, "purchase"),
+        ):
+            try:
+                category = guild.get_channel(cat_id) or await guild.fetch_channel(cat_id)
+                overwrites = {
+                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    user:     discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                    guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+                }
+                if staff_role:
+                    overwrites[staff_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
+                new_ch = await guild.create_text_channel(
+                    f"test-{kind}-{user.name}",
+                    category=category,
+                    overwrites=overwrites,
+                    topic="test",
+                )
+                await new_ch.send(
+                    view=_test_view(f"{GUIDE_EMOJI} **Test OK** — canale {label} creato per {user.mention}")
+                )
+                results.append(f"✅ Canale {label}: {new_ch.mention}")
+            except Exception as e:
+                traceback.print_exc()
+                results.append(f"❌ Canale {label}: {e}")
+
+        try:
+            await interaction.edit_original_response(content="\n".join(results))
+        except Exception:
+            traceback.print_exc()
+
+
+@bot.command(name="botton")
+async def botton_cmd(ctx):
+    if not ctx.author.guild_permissions.administrator:
+        return
+    view = BaseView(timeout=None)
+    c = discord.ui.Container(accent_colour=WHITE)
+    c.add_item(discord.ui.TextDisplay(
+        f"# {TICKET_EMOJI} Test Button\n"
+        f"Premi il pulsante per testare callback, messaggi e creazione canali."
+    ))
+    c.add_item(discord.ui.Separator())
+    c.add_item(discord.ui.ActionRow(TestButton()))
+    view.add_item(c)
+    await ctx.channel.send(view=view)
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+# ══════════════════════════════ FINE TEST ═════════════════════════════════════
 
 
 @bot.command(name="ticket")
