@@ -21,6 +21,9 @@ GUILD_ID                    = 0  # non usato
 # Link del pulsante "Premium Features" sotto il pannello !ticket
 PREMIUM_FEATURES_URL = "https://discord.com/channels/1562551271792181341/1562901227254185994"
 
+# Link del pulsante "Tutorial" sotto il pannello !freeaccesspanel
+TUTORIAL_URL = "https://discord.com/channels/1562551271792181341/1562567885434523678"
+
 ALERT_EMOJI    = "<a:Alert:1562891464432943124>"
 QUESTION_EMOJI = "<:question:1562891360850284595>"
 WARN_EMOJI     = "<a:warnings:1562891301760802938>"
@@ -28,6 +31,12 @@ GUIDE_EMOJI    = "<:guide:1562891148928884789>"
 MONEY_EMOJI    = "<:money:1562891076006584373>"
 SHOP_EMOJI     = "<a:shopping:1562891221423104072>"
 TICKET_EMOJI   = "<:ticket:1562891010999062739>"
+
+# ── NUOVE EMOJI — sostituisci con gli ID delle tue emoji custom ───────────────
+DOWNLOAD_EMOJI = "<:download:0000000000000000>"
+WINDOWS_EMOJI  = "<:windows:0000000000000000>"
+LINUX_EMOJI    = "<:linux:0000000000000000>"
+FOLDER_EMOJI   = "<:folder:0000000000000000>"
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
@@ -378,6 +387,144 @@ def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
     return view
 
 
+# ── FREE ACCESS: GUIDE TEXT (placeholder — rifiniscila tu) ────────────────────
+def _builder_guide(os_name: str) -> str:
+    if os_name == "windows":
+        return (
+            f"**{GUIDE_EMOJI} Quick Setup Guide — Windows**\n"
+            f"1. Extract the downloaded `.zip` file to a folder of your choice\n"
+            f"2. Right-click `setup.exe` and run it **as Administrator**\n"
+            f"3. Follow the on-screen installer steps\n"
+            f"4. Launch the builder from the Start Menu shortcut\n"
+            f"-# If Windows Defender flags it, add an exception for the folder."
+        )
+    return (
+        f"**{GUIDE_EMOJI} Quick Setup Guide — Linux**\n"
+        f"1. Extract the downloaded `.tar.gz` archive\n"
+        f"2. Open a terminal in that folder\n"
+        f"3. Run `chmod +x setup.sh && ./setup.sh`\n"
+        f"4. Launch the builder with `./builder`\n"
+        f"-# Make sure you have the required dependencies installed first."
+    )
+
+
+# ── FREE ACCESS: DM — OS SELECT MENU ───────────────────────────────────────────
+class OSSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Windows",
+                value="windows",
+                emoji=discord.PartialEmoji.from_str(WINDOWS_EMOJI),
+                description="Download the builder for Windows",
+            ),
+            discord.SelectOption(
+                label="Linux",
+                value="linux",
+                emoji=discord.PartialEmoji.from_str(LINUX_EMOJI),
+                description="Download the builder for Linux",
+            ),
+        ]
+        super().__init__(
+            placeholder="Select your Operating System",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="snap:os_select",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            os_choice = self.values[0]
+            emoji     = WINDOWS_EMOJI if os_choice == "windows" else LINUX_EMOJI
+            label     = "Windows" if os_choice == "windows" else "Linux"
+
+            c = discord.ui.Container(accent_colour=WHITE)
+            c.add_item(discord.ui.TextDisplay(
+                f"# {FOLDER_EMOJI} Here is your file for {label}\n"
+                f"-# {emoji} Builder — {label} edition"
+            ))
+            c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+            c.add_item(discord.ui.TextDisplay(_builder_guide(os_choice)))
+            c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+            c.add_item(discord.ui.TextDisplay(
+                f"{WARN_EMOJI} -# Attach the actual build file here before sending to users."
+            ))
+
+            result_view = discord.ui.LayoutView(timeout=None)
+            result_view.add_item(c)
+
+            await interaction.response.send_message(view=result_view)
+        except Exception:
+            traceback.print_exc()
+
+
+class OSSelectView(discord.ui.LayoutView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        c = discord.ui.Container(accent_colour=WHITE)
+        c.add_item(discord.ui.TextDisplay(
+            f"# {FOLDER_EMOJI} Femboy Builder\n"
+            f"Select your Operating System"
+        ))
+        c.add_item(discord.ui.Separator())
+        c.add_item(discord.ui.ActionRow(OSSelect()))
+        self.add_item(c)
+
+
+# ── FREE ACCESS: PANEL ────────────────────────────────────────────────────────
+class FreeAccessDownloadButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Download",
+            style=discord.ButtonStyle.success,
+            emoji=discord.PartialEmoji.from_str(DOWNLOAD_EMOJI),
+            custom_id="snap:freeaccess_download",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            await interaction.user.send(view=OSSelectView())
+            await interaction.response.send_message(
+                f"{DOWNLOAD_EMOJI} Check your DMs!", ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                f"{WARN_EMOJI} I can't DM you — please enable DMs from server members and try again.",
+                ephemeral=True,
+            )
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                await interaction.response.send_message(
+                    f"{WARN_EMOJI} Something went wrong: {e}", ephemeral=True
+                )
+            except Exception:
+                pass
+
+
+class FreeAccessPanelView(BaseView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        c = discord.ui.Container(accent_colour=WHITE)
+        c.add_item(discord.ui.TextDisplay(
+            f"# {FOLDER_EMOJI} Free Builder\n"
+            f"Press the button below to get access to free builder "
+            f"(guide will get sent in dm with builder download)"
+        ))
+        c.add_item(discord.ui.Separator())
+        c.add_item(discord.ui.ActionRow(
+            FreeAccessDownloadButton(),
+            discord.ui.Button(
+                label="Tutorial",
+                style=discord.ButtonStyle.link,
+                emoji=discord.PartialEmoji.from_str(GUIDE_EMOJI),
+                url=TUTORIAL_URL,
+            ),
+        ))
+        self.add_item(c)
+
+
 # ── BOT ───────────────────────────────────────────────────────────────────────
 intents = discord.Intents.default()
 intents.message_content = True
@@ -390,6 +537,8 @@ class SnapBot(commands.Bot):
         self.add_view(TicketPanelView())
         self.add_view(SupportTicketView())
         self.add_view(PurchaseTicketView())
+        self.add_view(FreeAccessPanelView())
+        self.add_view(OSSelectView())
 
 
 bot = SnapBot(command_prefix="!", intents=intents, help_command=None)
@@ -398,7 +547,7 @@ bot = SnapBot(command_prefix="!", intents=intents, help_command=None)
 @bot.event
 async def on_ready():
     print(f"Online as {bot.user} | discord.py {discord.__version__}")
-    print("[!] Se hai cambiato codice, rilancia !ticket per postare un pannello NUOVO.")
+    print("[!] Se hai cambiato codice, rilancia !ticket / !freeaccesspanel per postare un pannello NUOVO.")
     print("[!] Assicurati che giri UNA SOLA istanza del bot.")
 
 
@@ -436,6 +585,23 @@ async def ticket_panel_cmd(ctx):
         pass
     await ctx.channel.send(view=TicketPanelView())
     await ctx.channel.send(view=PremiumFeaturesView())
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+
+
+@bot.command(name="freeaccesspanel")
+async def free_access_panel_cmd(ctx):
+    if not ctx.author.guild_permissions.administrator:
+        return
+    try:
+        async for m in ctx.channel.history(limit=20):
+            if m.author == bot.user:
+                await m.delete()
+    except Exception:
+        pass
+    await ctx.channel.send(view=FreeAccessPanelView())
     try:
         await ctx.message.delete()
     except Exception:
