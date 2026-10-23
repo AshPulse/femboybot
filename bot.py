@@ -33,10 +33,10 @@ SHOP_EMOJI     = "<a:shopping:1562891221423104072>"
 TICKET_EMOJI   = "<:ticket:1562891010999062739>"
 
 # ── NUOVE EMOJI ─────────────────────────────────────────────────────────────
-DOWNLOAD_EMOJI = "<:download:1563221833551970354>"
+DOWNLOAD_EMOJI = "<:download_discord:1563225797144350790>"
 WINDOWS_EMOJI  = "<:windows:1563221221196300318>"
 LINUX_EMOJI    = "<:linux:1563221292151480320>"
-FOLDER_EMOJI   = "<:folder:1563221594158141440> "  # non mi hai dato questa, sostituiscila tu
+FOLDER_EMOJI   = "<:femboy:1563225407409361047>"  # non mi hai dato questa, sostituiscila tu
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
