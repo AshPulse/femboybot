@@ -41,7 +41,7 @@ LOADING_EMOJI  = "<a:loading:1563226245557387324>"
 
 # Immagine mostrata nell'embed del pannello !freeaccesspanel.
 # Metti il file "free_builder_banner.png" nella STESSA cartella di bot.py.
-FREE_BUILDER_IMAGE_FILENAME = "free_builder_banner.png"
+FREE_BUILDER_IMAGE_FILENAME = "FREE_BUILDER_IMAGE_FILENAME.png"
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
