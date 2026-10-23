@@ -441,7 +441,7 @@ class OSSelect(discord.ui.Select):
 
             c = discord.ui.Container(accent_colour=WHITE)
             c.add_item(discord.ui.TextDisplay(
-                f"# {FOLDER_EMOJI} Here is your file for {label}\n"
+                f"# {FOLDER_EMOJI}  Here is your file for {label}\n"
                 f"-# {emoji}  Builder — {label} edition"
             ))
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
@@ -464,7 +464,7 @@ class OSSelectView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI} Femboy Builder\n"
+            f"# {FOLDER_EMOJI}  Femboy Builder\n"
             f"Select your Operating System"
         ))
         c.add_item(discord.ui.Separator())
@@ -516,7 +516,7 @@ class FreeAccessPanelView(BaseView):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI} Free Builder\n"
+            f"# {FOLDER_EMOJI}  Free Builder\n"
             f"Press the button below to get access to free builder "
             f"(guide will get sent in dm with builder download)"
         ))
