@@ -36,7 +36,7 @@ TICKET_EMOJI   = "<:ticket:1562891010999062739>"
 DOWNLOAD_EMOJI = "<:download:1563221833551970354>"
 WINDOWS_EMOJI  = "<:windows:1563221221196300318>"
 LINUX_EMOJI    = "<:linux:1563221292151480320>"
-FOLDER_EMOJI   = "<:folder:0000000000000000>"  # non mi hai dato questa, sostituiscila tu
+FOLDER_EMOJI   = "<:folder:1563221594158141440> "  # non mi hai dato questa, sostituiscila tu
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
