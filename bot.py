@@ -442,13 +442,13 @@ class OSSelect(discord.ui.Select):
             c = discord.ui.Container(accent_colour=WHITE)
             c.add_item(discord.ui.TextDisplay(
                 f"# {FOLDER_EMOJI} Here is your file for {label}\n"
-                f"-# {emoji} Builder — {label} edition"
+                f"-# {emoji}  Builder — {label} edition"
             ))
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
             c.add_item(discord.ui.TextDisplay(_builder_guide(os_choice)))
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
             c.add_item(discord.ui.TextDisplay(
-                f"{WARN_EMOJI} -# Attach the actual build file here before sending to users."
+                f"{WARN_EMOJI} Attach the actual build file here before sending to users."
             ))
 
             result_view = discord.ui.LayoutView(timeout=None)
