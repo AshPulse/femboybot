@@ -486,11 +486,7 @@ def _builder_guide(os_name: str) -> str:
         )
     return (
         f"**{GUIDE_EMOJI} Quick Setup Guide — Linux**\n"
-        f"1. Extract the downloaded `.tar.gz` archive\n"
-        f"2. Open a terminal in that folder\n"
-        f"3. Run `chmod +x setup.sh && ./setup.sh`\n"
-        f"4. Launch the builder with `./builder`\n"
-        f"-# Make sure you have the required dependencies installed first."
+        f"1. Linux Download will come soon!"
     )
 
 
