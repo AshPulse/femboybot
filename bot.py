@@ -396,6 +396,60 @@ class PremiumFeaturesView(discord.ui.LayoutView):
         self.add_item(c)
 
 
+class PremiumVsFreeView(discord.ui.LayoutView):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+        premium = discord.ui.Container(accent_colour=YELLOW)
+        premium.add_item(discord.ui.TextDisplay(
+            f"# {SHOP_EMOJI} Premium Access — ${PRICE_USD}\n"
+            f"-# One-time payment · Litecoin (LTC)"
+        ))
+        premium.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        premium.add_item(discord.ui.TextDisplay(
+            f"{MONEY_EMOJI}  Instant access to every new number\n"
+            f"{MONEY_EMOJI}  Priority queue — skip the wait\n"
+            f"{MONEY_EMOJI}  Unlimited claims, no daily cap\n"
+            f"{MONEY_EMOJI}  Access to every available country\n"
+            f"{MONEY_EMOJI}  Priority support from staff"
+        ))
+        self.add_item(premium)
+
+        free = discord.ui.Container(accent_colour=WHITE)
+        free.add_item(discord.ui.TextDisplay(
+            f"# {FOLDER_EMOJI} Free Access\n"
+            f"-# No payment required"
+        ))
+        free.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        free.add_item(discord.ui.TextDisplay(
+            f"{WARN_EMOJI}  Limited claims per day\n"
+            f"{WARN_EMOJI}  Standard queue — longer wait times\n"
+            f"{WARN_EMOJI}  Only a few countries available\n"
+            f"{WARN_EMOJI}  No priority support"
+        ))
+        free.add_item(discord.ui.Separator())
+        free.add_item(discord.ui.TextDisplay(
+            f"-# Want it all? Open a **Purchase** ticket to upgrade."
+        ))
+        self.add_item(free)
+
+
+@bot.command(name="premiumfeatures")
+@staff_only()
+async def premium_features_cmd(ctx):
+    try:
+        async for m in ctx.channel.history(limit=20):
+            if m.author == bot.user:
+                await m.delete()
+    except Exception:
+        pass
+    await ctx.channel.send(view=PremiumVsFreeView())
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+
+
 def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
     guild_id = member.guild.id
     view = discord.ui.LayoutView(timeout=None)
@@ -717,7 +771,8 @@ class HelpView(BaseView):
         c.add_item(discord.ui.TextDisplay(
             f"**{TICKET_EMOJI} Panels**\n"
             f"`!ticket` — Post the support/purchase ticket panel in this channel\n"
-            f"`!freeaccesspanel` — Post the free builder panel in this channel"
+            f"`!freeaccesspanel` — Post the free builder panel in this channel\n"
+            f"`!premiumfeatures` — Post the Premium vs Free comparison in this channel"
         ))
         c.add_item(discord.ui.Separator())
 
