@@ -634,8 +634,8 @@ class QuickTutorialView(discord.ui.LayoutView):
 
         c.add_item(discord.ui.TextDisplay(
             f"**{GUIDE_EMOJI} Step 4 — Build**\n"
-            f"Launch the builder from the Start Menu shortcut, load your project, "
-            f"and press **Build** to generate the output."
+            f"Launch the builder from the Start Menu shortcut, put your Discord Webhook and load your project, "
+            f"finally press **Build** to generate the RAT."
         ))
         c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
 
