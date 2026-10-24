@@ -38,6 +38,9 @@ PREMIUM_FEATURES_URL = "https://discord.com/channels/1562551271792181341/1562901
 # Link del pulsante "Get Premium" sotto l'embed delle Free Access Builder features (!tutorial)
 GET_PREMIUM_URL = "https://discord.com/channels/1562551271792181341/1562901115803144315"
 
+# Link del pulsante "Support" dentro !tutorial — porta al canale ticket
+SUPPORT_URL = "https://discord.com/channels/1562551271792181341/1562901115803144315"
+
 # Link del pulsante "Tutorial" sotto il pannello !freeaccesspanel
 TUTORIAL_URL = "https://discord.com/channels/1562551271792181341/1562567885434523678"
 
@@ -510,7 +513,7 @@ class OSSelect(discord.ui.Select):
 
             c = discord.ui.Container(accent_colour=WHITE)
             c.add_item(discord.ui.TextDisplay(
-                f"# {FOLDER_EMOJI} Here is your file for {label}\n"
+                f"# {DOWNLOAD_EMOJI} Here is your file for {label}\n"
                 f"-# {emoji}  Builder — {label} edition"
             ))
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
@@ -533,7 +536,7 @@ class OSSelectView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI} Femboy Builder\n"
+            f"# {DOWNLOAD_EMOJI} Femboy Builder\n"
             f"Select your Operating System"
         ))
         c.add_item(discord.ui.Separator())
@@ -595,18 +598,53 @@ class QuickTutorialView(discord.ui.LayoutView):
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
             f"# {GUIDE_EMOJI} Quick Tutorial\n"
-            f"-# Get the builder up and running in under a minute"
+            f"-# A full walkthrough to get the builder installed and running"
         ))
         c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+
         c.add_item(discord.ui.TextDisplay(
-            f"{DOWNLOAD_EMOJI}  **1.** Download the builder from the Free Builder panel\n"
-            f"{FOLDER_EMOJI}  **2.** Extract the downloaded file to a folder\n"
-            f"{WINDOWS_EMOJI}  **3.** Run `setup.exe` (right-click → Run as Administrator)\n"
-            f"{GUIDE_EMOJI}  **4.** Open the builder and press **Build** to generate your project"
+            f"**{DOWNLOAD_EMOJI} Step 1 — Download**\n"
+            f"Go to the Free Builder panel and press **Download**. "
+            f"The file and setup guide will be sent to your DMs — "
+            f"make sure you have DMs enabled for this server."
         ))
         c.add_item(discord.ui.Separator())
+
         c.add_item(discord.ui.TextDisplay(
-            f"-# If Windows Defender flags the file, add an exception for the folder."
+            f"**{GUIDE_EMOJI} Step 2 — Extract**\n"
+            f"Extract the downloaded archive to a folder of your choice. "
+            f"Don't run it straight from inside the `.zip`, extract it first."
+        ))
+        c.add_item(discord.ui.Separator())
+
+        c.add_item(discord.ui.TextDisplay(
+            f"**{WINDOWS_EMOJI} Step 3 — Run the installer**\n"
+            f"Open the extracted folder and right-click `setup.exe` → "
+            f"**Run as Administrator**. Follow the on-screen steps to install."
+        ))
+        c.add_item(discord.ui.Separator())
+
+        c.add_item(discord.ui.TextDisplay(
+            f"**{GUIDE_EMOJI} Step 4 — Build**\n"
+            f"Launch the builder from the Start Menu shortcut, load your project, "
+            f"and press **Build** to generate the output."
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+
+        c.add_item(discord.ui.TextDisplay(
+            f"{WARN_EMOJI} **Troubleshooting**\n"
+            f"If Windows Defender or your antivirus flags the file, add an exception "
+            f"for the folder — this is expected for unsigned builder tools.\n"
+            f"Still stuck? Open a support ticket below and our team will help you out."
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.ActionRow(
+            discord.ui.Button(
+                label="Support",
+                style=discord.ButtonStyle.link,
+                emoji=discord.PartialEmoji.from_str(GUIDE_EMOJI),
+                url=SUPPORT_URL,
+            ),
         ))
         self.add_item(c)
 
@@ -616,12 +654,12 @@ class FreeBuilderFeaturesView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI} Free Access Builder\n"
+            f"# {DOWNLOAD_EMOJI} Free Access Builder\n"
             f"-# What's included with the free version"
         ))
         c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
         c.add_item(discord.ui.TextDisplay(
-            "\n".join(f"{FOLDER_EMOJI}  +{feat}" for feat in FREE_BUILDER_FEATURES)
+            "\n".join(f"{DOWNLOAD_EMOJI}  +{feat}" for feat in FREE_BUILDER_FEATURES)
         ))
         c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
         c.add_item(discord.ui.ActionRow(
@@ -640,7 +678,7 @@ class FreeAccessPanelView(BaseView):
         super().__init__(timeout=None)
         c = discord.ui.Container(accent_colour=WHITE)
         c.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI} Free Builder\n"
+            f"# {DOWNLOAD_EMOJI} Free Builder\n"
             f"Press the button below to get **access to the free builder**.\n"
             f"-# A **setup guide** will be sent to your DMs together with the **download**."
         ))
@@ -786,7 +824,6 @@ async def tutorial_cmd(ctx):
     except Exception:
         pass
     await ctx.channel.send(view=QuickTutorialView())
-    await ctx.channel.send(view=FreeBuilderFeaturesView())
     try:
         await ctx.message.delete()
     except Exception:
@@ -806,6 +843,7 @@ async def free_access_panel_cmd(ctx):
     image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), FREE_BUILDER_IMAGE_FILENAME)
     file = discord.File(image_path, filename=FREE_BUILDER_IMAGE_FILENAME)
     await ctx.channel.send(view=FreeAccessPanelView(), file=file)
+    await ctx.channel.send(view=FreeBuilderFeaturesView())
     try:
         await ctx.message.delete()
     except Exception:
@@ -849,7 +887,7 @@ class HelpView(BaseView):
             f"`!ticket` — Post the support/purchase ticket panel in this channel\n"
             f"`!freeaccesspanel` — Post the free builder panel in this channel\n"
             f"`!premiumfeatures` — Post the Premium vs Free comparison in this channel\n"
-            f"`!tutorial` — Post the quick install tutorial + Free Builder features"
+            f"`!tutorial` — Post the full install tutorial (with a Support button)"
         ))
         c.add_item(discord.ui.Separator())
 
@@ -874,7 +912,7 @@ class HelpView(BaseView):
         c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
 
         c.add_item(discord.ui.TextDisplay(
-            f"-# {FOLDER_EMOJI} Need something that isn't listed here? Ask in the dev channel."
+            f"-# {DOWNLOAD_EMOJI} Need something that isn't listed here? Ask in the dev channel."
         ))
         self.add_item(c)
 
