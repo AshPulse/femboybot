@@ -434,22 +434,6 @@ class PremiumVsFreeView(discord.ui.LayoutView):
         self.add_item(free)
 
 
-@bot.command(name="premiumfeatures")
-@staff_only()
-async def premium_features_cmd(ctx):
-    try:
-        async for m in ctx.channel.history(limit=20):
-            if m.author == bot.user:
-                await m.delete()
-    except Exception:
-        pass
-    await ctx.channel.send(view=PremiumVsFreeView())
-    try:
-        await ctx.message.delete()
-    except Exception:
-        pass
-
-
 def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
     guild_id = member.guild.id
     view = discord.ui.LayoutView(timeout=None)
@@ -711,6 +695,22 @@ async def ticket_panel_cmd(ctx):
         pass
     await ctx.channel.send(view=TicketPanelView())
     await ctx.channel.send(view=PremiumFeaturesView())
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+
+
+@bot.command(name="premiumfeatures")
+@staff_only()
+async def premium_features_cmd(ctx):
+    try:
+        async for m in ctx.channel.history(limit=20):
+            if m.author == bot.user:
+                await m.delete()
+    except Exception:
+        pass
+    await ctx.channel.send(view=PremiumVsFreeView())
     try:
         await ctx.message.delete()
     except Exception:
