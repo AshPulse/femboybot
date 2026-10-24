@@ -410,11 +410,20 @@ class PremiumFeaturesView(discord.ui.LayoutView):
 
 
 PREMIUM_PERKS = [
-    "Claim Numbers",
-    "Priority Queue",
-    "Unlimited Claims",
-    "All Countries",
-    "Priority Support",
+    " WebCam Stream",
+    " Audio Capture",
+    " Keylogger",
+    " Remote Access",
+    " Remote Shell",
+    " Exodus Wallet (gets access to victim's wallet)",
+    " Troll features",
+    " DDOS PANEL INTEGRATED",
+    " Crypto Clipper",
+    " Command execute",
+    " Power options",
+    " Steam Checker",
+    " Priority Support",
+
 ]
 
 
@@ -584,11 +593,14 @@ class FreeAccessDownloadButton(discord.ui.Button):
 
 
 FREE_BUILDER_FEATURES = [
-    "Access to the core builder",
-    "Basic export options",
-    "Community templates",
-    "Standard build speed",
-    "Manual updates",
+    " Minecraft Session",
+    " Discord Tokens",
+    " ScreenShot Capture",
+    " Browser Data/Cookies/Passwords",
+    " Credential Files",
+    " Steam Session",
+    " Mullvad Session",
+    " More..."
 ]
 
 
