@@ -824,6 +824,7 @@ async def tutorial_cmd(ctx):
     except Exception:
         pass
     await ctx.channel.send(view=QuickTutorialView())
+    await ctx.channel.send(view=FreeBuilderFeaturesView())
     try:
         await ctx.message.delete()
     except Exception:
@@ -843,7 +844,6 @@ async def free_access_panel_cmd(ctx):
     image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), FREE_BUILDER_IMAGE_FILENAME)
     file = discord.File(image_path, filename=FREE_BUILDER_IMAGE_FILENAME)
     await ctx.channel.send(view=FreeAccessPanelView(), file=file)
-    await ctx.channel.send(view=FreeBuilderFeaturesView())
     try:
         await ctx.message.delete()
     except Exception:
