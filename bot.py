@@ -683,6 +683,26 @@ async def free_access_panel_cmd(ctx):
 
 
 # ── SLASH COMMANDS (staff only) ──────────────────────────────────────────────────
+@bot.command(name="wipecommands")
+@staff_only()
+async def wipe_commands_cmd(ctx):
+    """!wipecommands — cancella TUTTI gli slash command (anche quelli di bot/tool vecchi
+    tipo Lovable) e poi risincronizza solo quelli attuali del bot."""
+    msg = await ctx.send(f"{LOADING_EMOJI} Wiping old slash commands...")
+
+    # 1) cancella i comandi globali
+    bot.tree.clear_commands(guild=None)
+    await bot.tree.sync()
+
+    # 2) cancella i comandi locali di QUESTA guild e risincronizza i tuoi
+    bot.tree.clear_commands(guild=ctx.guild)
+    await bot.tree.sync(guild=ctx.guild)
+    bot.tree.copy_global_to(guild=ctx.guild)
+    await bot.tree.sync(guild=ctx.guild)
+
+    await msg.edit(content=f"{ALERT_EMOJI} Done! Old commands wiped. It may take a few minutes to disappear from Discord's UI.")
+
+
 @bot.tree.command(name="autorole", description="Set the role automatically given to new members")
 @app_commands.describe(role="The role to assign on join")
 @staff_only_slash()
