@@ -3,6 +3,7 @@ import os
 import traceback
 import aiohttp
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 TOKEN = os.getenv("TOKEN", "IL_TUO_TOKEN")
@@ -18,6 +19,33 @@ CHANNEL_FEATURES_ID         = 1562901227254185994
 CHANNEL_TICKETS_ID          = 1562901115803144315
 GUILD_ID                    = 0  # non usato
 
+# ── WORD FILTER ────────────────────────────────────────────────────────────────
+GENERAL_CHANNEL_ID = 1562568639838953472
+
+# Una parola per riga. Il controllo è case-insensitive e cerca la parola
+# ANCHE dentro altre parole (es. "abaa" blocca anche "xabaax").
+# Se vuoi un match solo su parola intera, dimmelo e lo cambio.
+BANNED_WORDS_RAW = """
+rat
+Rat
+rAt
+ratt
+virus
+scam
+Virus
+scamm
+Scam
+VirusTOtal
+VIrustotal
+Virustotal
+virustotal
+viruss
+dm
+d.m
+d-m
+"""
+BANNED_WORDS = [w.strip().lower() for w in BANNED_WORDS_RAW.splitlines() if w.strip()]
+
 # Link del pulsante "Premium Features" sotto il pannello !ticket
 PREMIUM_FEATURES_URL = "https://discord.com/channels/1562551271792181341/1562901227254185994"
 
@@ -32,19 +60,45 @@ MONEY_EMOJI    = "<:money:1562891076006584373>"
 SHOP_EMOJI     = "<a:shopping:1562891221423104072>"
 TICKET_EMOJI   = "<:ticket:1562891010999062739>"
 
-# ── NUOVE EMOJI ─────────────────────────────────────────────────────────────
 DOWNLOAD_EMOJI = "<:download_discord:1563225797144350790>"
 WINDOWS_EMOJI  = "<:windows:1563221221196300318>"
 LINUX_EMOJI    = "<:linux:1563221292151480320>"
 FOLDER_EMOJI   = "<:femboy:1563225407409361047>"
 LOADING_EMOJI  = "<a:loading:1563226245557387324>"
 
-# Immagine mostrata nell'embed del pannello !freeaccesspanel.
-# Metti il file "free_builder_banner.png" nella STESSA cartella di bot.py.
 FREE_BUILDER_IMAGE_FILENAME = "FREE_BUILDER_IMAGE_FILENAME.png"
 
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
+
+
+# ── STAFF CHECK ─────────────────────────────────────────────────────────────────
+def is_staff_member(member: discord.Member) -> bool:
+    if member.guild_permissions.administrator:
+        return True
+    return any(r.id == STAFF_ROLE_ID for r in getattr(member, "roles", []) or [])
+
+
+def staff_only():
+    """Decorator per i comandi con prefisso (!comando)."""
+    async def predicate(ctx: commands.Context):
+        if not is_staff_member(ctx.author):
+            await ctx.send(f"{WARN_EMOJI} You don't have permission to use this command.", delete_after=5)
+            return False
+        return True
+    return commands.check(predicate)
+
+
+def staff_only_slash():
+    """Decorator per gli slash command (/comando)."""
+    async def predicate(interaction: discord.Interaction):
+        if not is_staff_member(interaction.user):
+            await interaction.response.send_message(
+                f"{WARN_EMOJI} You don't have permission to use this command.", ephemeral=True
+            )
+            return False
+        return True
+    return app_commands.check(predicate)
 
 
 # ── LTC ───────────────────────────────────────────────────────────────────────
@@ -61,8 +115,6 @@ async def _usd_to_ltc(usd: float):
 
 
 # ── TICKET HELPERS ────────────────────────────────────────────────────────────
-# Il topic del canale contiene:  owner:<id>   oppure   owner:<id>|ltc:<importo>
-# Così dopo un riavvio del bot i messaggi dei ticket si ricostruiscono giusti.
 def _topic_owner(topic: str):
     return (topic or "").split("|")[0]
 
@@ -90,7 +142,6 @@ async def _find_user_ticket(guild: discord.Guild, user_id: int):
 
 async def _create_ticket_channel(interaction: discord.Interaction, category_id: int,
                                  kind: str, ltc_str: str = ""):
-    """Returns (channel, error_message). Does NOT touch the interaction response."""
     guild = interaction.guild
     user  = interaction.user
 
@@ -133,7 +184,7 @@ async def _create_ticket_channel(interaction: discord.Interaction, category_id: 
     return channel, None
 
 
-# ── BASE VIEW (logga gli errori invece di farli sparire) ──────────────────────
+# ── BASE VIEW ──────────────────────────────────────────────────────────────────
 class BaseView(discord.ui.LayoutView):
     async def on_error(self, interaction: discord.Interaction, error: Exception, item):
         traceback.print_exception(type(error), error, error.__traceback__)
@@ -155,8 +206,6 @@ class PingStaffButton(discord.ui.Button):
             channel  = interaction.channel
             owner_id = _owner_id_from_topic(channel.topic)
 
-            # Ricostruisco la view giusta in base alla categoria del ticket
-            # (funziona anche dopo un riavvio del bot).
             if getattr(channel, "category_id", None) == TICKET_PURCHASE_CATEGORY_ID:
                 new_view = PurchaseTicketView(_ltc_from_topic(channel.topic), pinged=True, owner_id=owner_id)
             else:
@@ -205,7 +254,6 @@ class PurchaseButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # ACK FIRST — deve sempre avvenire entro 3s, qualunque cosa succeda.
         try:
             await interaction.response.send_message(f"{LOADING_EMOJI} Opening your ticket...", ephemeral=True)
         except Exception:
@@ -267,7 +315,7 @@ class SupportButton(discord.ui.Button):
                 pass
 
 
-# ── TICKET VIEWS (persistent — timeout=None) ──────────────────────────────────
+# ── TICKET VIEWS ──────────────────────────────────────────────────────────────
 class SupportTicketView(BaseView):
     def __init__(self, pinged: bool = False, owner_id: int = None):
         super().__init__(timeout=None)
@@ -327,7 +375,6 @@ class PurchaseTicketView(BaseView):
         self.add_item(c)
 
 
-# ── PANEL VIEW (persistent) ───────────────────────────────────────────────────
 class TicketPanelView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
@@ -343,7 +390,6 @@ class TicketPanelView(BaseView):
         self.add_item(c)
 
 
-# ── PREMIUM FEATURES EMBED (sotto il pannello, solo link button) ──────────────
 class PremiumFeaturesView(discord.ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
@@ -364,7 +410,6 @@ class PremiumFeaturesView(discord.ui.LayoutView):
         self.add_item(c)
 
 
-# ── WELCOME VIEW (V2) ─────────────────────────────────────────────────────────
 def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
     guild_id = member.guild.id
     view = discord.ui.LayoutView(timeout=None)
@@ -392,7 +437,6 @@ def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
     return view
 
 
-# ── FREE ACCESS: GUIDE TEXT (placeholder — rifiniscila tu) ────────────────────
 def _builder_guide(os_name: str) -> str:
     if os_name == "windows":
         return (
@@ -413,28 +457,23 @@ def _builder_guide(os_name: str) -> str:
     )
 
 
-# ── FREE ACCESS: DM — OS SELECT MENU ───────────────────────────────────────────
 class OSSelect(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(
-                label="Windows",
-                value="windows",
+                label="Windows", value="windows",
                 emoji=discord.PartialEmoji.from_str(WINDOWS_EMOJI),
                 description="Download the builder for Windows",
             ),
             discord.SelectOption(
-                label="Linux",
-                value="linux",
+                label="Linux", value="linux",
                 emoji=discord.PartialEmoji.from_str(LINUX_EMOJI),
                 description="Download the builder for Linux",
             ),
         ]
         super().__init__(
             placeholder="Select your Operating System",
-            min_values=1,
-            max_values=1,
-            options=options,
+            min_values=1, max_values=1, options=options,
             custom_id="snap:os_select",
         )
 
@@ -485,7 +524,6 @@ class OSSelectView(discord.ui.LayoutView):
         self.add_item(c)
 
 
-# ── FREE ACCESS: PANEL ────────────────────────────────────────────────────────
 class FreeAccessDownloadButton(discord.ui.Button):
     def __init__(self):
         super().__init__(
@@ -496,7 +534,6 @@ class FreeAccessDownloadButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # ACK FIRST con un messaggio di "loading", poi aggiorno il risultato.
         try:
             await interaction.response.send_message(f"{LOADING_EMOJI} Sending in dms...", ephemeral=True)
         except Exception:
@@ -551,7 +588,6 @@ intents.members = True
 
 class SnapBot(commands.Bot):
     async def setup_hook(self):
-        # Registrate UNA SOLA VOLTA, prima della connessione (on_ready può scattare più volte)
         self.add_view(TicketPanelView())
         self.add_view(SupportTicketView())
         self.add_view(PurchaseTicketView())
@@ -564,6 +600,12 @@ bot = SnapBot(command_prefix="!", intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
+    for g in bot.guilds:
+        try:
+            bot.tree.copy_global_to(guild=g)
+            await bot.tree.sync(guild=g)
+        except Exception:
+            traceback.print_exc()
     print(f"Online as {bot.user} | discord.py {discord.__version__}")
     print("[!] Se hai cambiato codice, rilancia !ticket / !freeaccesspanel per postare un pannello NUOVO.")
     print("[!] Assicurati che giri UNA SOLA istanza del bot.")
@@ -571,7 +613,6 @@ async def on_ready():
 
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
-    # Solo log di debug: mostra ogni click sui pulsanti in console.
     if interaction.type == discord.InteractionType.component:
         cid = (interaction.data or {}).get("custom_id")
         print(f"[CLICK] {interaction.user} -> {cid}")
@@ -591,10 +632,37 @@ async def on_member_join(member: discord.Member):
         traceback.print_exc()
 
 
-@bot.command(name="ticket")
-async def ticket_panel_cmd(ctx):
-    if not ctx.author.guild_permissions.administrator:
+# ── WORD FILTER ────────────────────────────────────────────────────────────────
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        await bot.process_commands(message)
         return
+
+    if message.channel.id == GENERAL_CHANNEL_ID and BANNED_WORDS:
+        content_lower = message.content.lower()
+        if any(word in content_lower for word in BANNED_WORDS):
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            try:
+                warn = await message.channel.send(
+                    f"{WARN_EMOJI} {message.author.mention} that word isn't allowed here.",
+                )
+                await asyncio.sleep(5)
+                await warn.delete()
+            except Exception:
+                pass
+            return  # non processare come comando
+
+    await bot.process_commands(message)
+
+
+# ── PREFIX COMMANDS (staff only) ────────────────────────────────────────────────
+@bot.command(name="ticket")
+@staff_only()
+async def ticket_panel_cmd(ctx):
     try:
         async for m in ctx.channel.history(limit=20):
             if m.author == bot.user:
@@ -610,9 +678,8 @@ async def ticket_panel_cmd(ctx):
 
 
 @bot.command(name="freeaccesspanel")
+@staff_only()
 async def free_access_panel_cmd(ctx):
-    if not ctx.author.guild_permissions.administrator:
-        return
     try:
         async for m in ctx.channel.history(limit=20):
             if m.author == bot.user:
@@ -627,6 +694,77 @@ async def free_access_panel_cmd(ctx):
         await ctx.message.delete()
     except Exception:
         pass
+
+
+# ── SLASH COMMANDS (staff only) ──────────────────────────────────────────────────
+@bot.tree.command(name="autorole", description="Set the role automatically given to new members")
+@app_commands.describe(role="The role to assign on join")
+@staff_only_slash()
+async def autorole_cmd(interaction: discord.Interaction, role: discord.Role):
+    global AUTOROLE_ID
+    AUTOROLE_ID = role.id
+    await interaction.response.send_message(
+        f"{ALERT_EMOJI} New members will now automatically receive {role.mention}.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="roleall", description="Give a role to every member in the server")
+@app_commands.describe(role="The role to give to everyone")
+@staff_only_slash()
+async def roleall_cmd(interaction: discord.Interaction, role: discord.Role):
+    await interaction.response.send_message(
+        f"{LOADING_EMOJI} Giving {role.mention} to everyone, this may take a while...",
+        ephemeral=True,
+    )
+    guild = interaction.guild
+    given, failed = 0, 0
+    async for member in guild.fetch_members(limit=None):
+        if member.bot:
+            continue
+        if role in member.roles:
+            continue
+        try:
+            await member.add_roles(role, reason=f"/roleall by {interaction.user}")
+            given += 1
+        except Exception:
+            failed += 1
+    await interaction.edit_original_response(
+        content=f"{ALERT_EMOJI} Done! Role given to **{given}** members. Failed: **{failed}**."
+    )
+
+
+@bot.tree.command(name="kick", description="Kick a member from the server")
+@app_commands.describe(member="The member to kick", reason="Reason for the kick")
+@staff_only_slash()
+async def kick_cmd(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    if not interaction.guild.me.guild_permissions.kick_members:
+        await interaction.response.send_message(f"{WARN_EMOJI} I don't have permission to kick members.", ephemeral=True)
+        return
+    try:
+        await member.kick(reason=f"{reason} — by {interaction.user}")
+        await interaction.response.send_message(
+            f"{ALERT_EMOJI} {member.mention} has been kicked.\n**Reason:** {reason}",
+        )
+    except discord.Forbidden:
+        await interaction.response.send_message(f"{WARN_EMOJI} I can't kick that member (role hierarchy).", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"{WARN_EMOJI} Error: {e}", ephemeral=True)
+
+
+# ── AUTOROLE ON JOIN ──────────────────────────────────────────────────────────
+AUTOROLE_ID = None  # impostato con /autorole — si resetta al riavvio del bot
+
+@bot.listen("on_member_join")
+async def _autorole_on_join(member: discord.Member):
+    if AUTOROLE_ID is None:
+        return
+    role = member.guild.get_role(AUTOROLE_ID)
+    if role:
+        try:
+            await member.add_roles(role, reason="Autorole")
+        except Exception:
+            traceback.print_exc()
 
 
 bot.run(TOKEN)
