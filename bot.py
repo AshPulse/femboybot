@@ -703,6 +703,66 @@ async def wipe_commands_cmd(ctx):
     await msg.edit(content=f"{ALERT_EMOJI} Done! Old commands wiped. It may take a few minutes to disappear from Discord's UI.")
 
 
+class HelpView(BaseView):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+        c = discord.ui.Container(accent_colour=WHITE)
+        c.add_item(discord.ui.TextDisplay(
+            f"# {GUIDE_EMOJI} Staff Commands\n"
+            f"-# All commands below require the staff role"
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+
+        c.add_item(discord.ui.TextDisplay(
+            f"**{TICKET_EMOJI} Panels**\n"
+            f"`!ticket` — Post the support/purchase ticket panel in this channel\n"
+            f"`!freeaccesspanel` — Post the free builder panel in this channel"
+        ))
+        c.add_item(discord.ui.Separator())
+
+        c.add_item(discord.ui.TextDisplay(
+            f"**{ALERT_EMOJI} Roles**\n"
+            f"`/autorole role:` — Set (or unset) the role auto-given on join\n"
+            f"`/roleall role:` — Give a role to every member in the server"
+        ))
+        c.add_item(discord.ui.Separator())
+
+        c.add_item(discord.ui.TextDisplay(
+            f"**{WARN_EMOJI} Moderation**\n"
+            f"`/kick member: reason:` — Kick a member from the server"
+        ))
+        c.add_item(discord.ui.Separator())
+
+        c.add_item(discord.ui.TextDisplay(
+            f"**{QUESTION_EMOJI} Utility**\n"
+            f"`!wipecommands` — Wipe stale slash commands and resync the current ones\n"
+            f"`!help` — Show this message"
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+
+        c.add_item(discord.ui.TextDisplay(
+            f"-# {FOLDER_EMOJI} Need something that isn't listed here? Ask in the dev channel."
+        ))
+        self.add_item(c)
+
+
+@bot.command(name="help")
+@staff_only()
+async def help_cmd(ctx):
+    await ctx.send(view=HelpView())
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+
+
+@bot.tree.command(name="help", description="Show the staff command list")
+@staff_only_slash()
+async def help_slash_cmd(interaction: discord.Interaction):
+    await interaction.response.send_message(view=HelpView(), ephemeral=True)
+
+
 @bot.tree.command(name="autorole", description="Set the role automatically given to new members")
 @app_commands.describe(role="The role to assign on join")
 @staff_only_slash()
