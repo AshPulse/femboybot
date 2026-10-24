@@ -396,22 +396,13 @@ class PremiumFeaturesView(discord.ui.LayoutView):
         self.add_item(c)
 
 
-PREMIUM_VS_FREE_ROWS = [
-    ("Claim Numbers",     "YES", "NO"),
-    ("Priority Queue",    "YES", "NO"),
-    ("Unlimited Claims",  "YES", "NO"),
-    ("All Countries",     "YES", "NO"),
-    ("Priority Support",  "YES", "NO"),
+PREMIUM_PERKS = [
+    "Claim Numbers",
+    "Priority Queue",
+    "Unlimited Claims",
+    "All Countries",
+    "Priority Support",
 ]
-
-def _build_comparison_table() -> str:
-    feat_w = max(len(r[0]) for r in PREMIUM_VS_FREE_ROWS) + 2
-    col_w  = 8
-    header = f"{'FEATURE'.ljust(feat_w)}{'PREMIUM'.ljust(col_w)}{'FREE'}"
-    lines  = [header, "-" * len(header)]
-    for name, prem, free in PREMIUM_VS_FREE_ROWS:
-        lines.append(f"{name.ljust(feat_w)}{prem.ljust(col_w)}{free}")
-    return "\n".join(lines)
 
 
 class PremiumVsFreeView(discord.ui.LayoutView):
@@ -420,14 +411,16 @@ class PremiumVsFreeView(discord.ui.LayoutView):
 
         c = discord.ui.Container(accent_colour=YELLOW)
         c.add_item(discord.ui.TextDisplay(
-            f"# {SHOP_EMOJI} Premium vs Free\n"
-            f"-# What you get with Premium Access (${PRICE_USD}) compared to Free"
+            f"# {SHOP_EMOJI} Premium Access — ${PRICE_USD}\n"
+            f"-# One-time payment · Litecoin (LTC)"
         ))
         c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
-        c.add_item(discord.ui.TextDisplay(f"```{_build_comparison_table()}```"))
+        c.add_item(discord.ui.TextDisplay(
+            "\n".join(f"{MONEY_EMOJI}  +{perk}" for perk in PREMIUM_PERKS)
+        ))
         c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
         c.add_item(discord.ui.TextDisplay(
-            f"{MONEY_EMOJI} Want it all? Open a **Purchase** ticket to upgrade."
+            f"-# Want it all? Open a **Purchase** ticket to upgrade."
         ))
         self.add_item(c)
 
