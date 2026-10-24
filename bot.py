@@ -396,42 +396,40 @@ class PremiumFeaturesView(discord.ui.LayoutView):
         self.add_item(c)
 
 
+PREMIUM_VS_FREE_ROWS = [
+    ("Claim Numbers",     "YES", "NO"),
+    ("Priority Queue",    "YES", "NO"),
+    ("Unlimited Claims",  "YES", "NO"),
+    ("All Countries",     "YES", "NO"),
+    ("Priority Support",  "YES", "NO"),
+]
+
+def _build_comparison_table() -> str:
+    feat_w = max(len(r[0]) for r in PREMIUM_VS_FREE_ROWS) + 2
+    col_w  = 8
+    header = f"{'FEATURE'.ljust(feat_w)}{'PREMIUM'.ljust(col_w)}{'FREE'}"
+    lines  = [header, "-" * len(header)]
+    for name, prem, free in PREMIUM_VS_FREE_ROWS:
+        lines.append(f"{name.ljust(feat_w)}{prem.ljust(col_w)}{free}")
+    return "\n".join(lines)
+
+
 class PremiumVsFreeView(discord.ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
 
-        premium = discord.ui.Container(accent_colour=YELLOW)
-        premium.add_item(discord.ui.TextDisplay(
-            f"# {SHOP_EMOJI} Premium Access — ${PRICE_USD}\n"
-            f"-# One-time payment · Litecoin (LTC)"
+        c = discord.ui.Container(accent_colour=YELLOW)
+        c.add_item(discord.ui.TextDisplay(
+            f"# {SHOP_EMOJI} Premium vs Free\n"
+            f"-# What you get with Premium Access (${PRICE_USD}) compared to Free"
         ))
-        premium.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
-        premium.add_item(discord.ui.TextDisplay(
-            f"{MONEY_EMOJI}  Instant access to every new number\n"
-            f"{MONEY_EMOJI}  Priority queue — skip the wait\n"
-            f"{MONEY_EMOJI}  Unlimited claims, no daily cap\n"
-            f"{MONEY_EMOJI}  Access to every available country\n"
-            f"{MONEY_EMOJI}  Priority support from staff"
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.TextDisplay(f"```{_build_comparison_table()}```"))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.TextDisplay(
+            f"{MONEY_EMOJI} Want it all? Open a **Purchase** ticket to upgrade."
         ))
-        self.add_item(premium)
-
-        free = discord.ui.Container(accent_colour=WHITE)
-        free.add_item(discord.ui.TextDisplay(
-            f"# {FOLDER_EMOJI} Free Access\n"
-            f"-# No payment required"
-        ))
-        free.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
-        free.add_item(discord.ui.TextDisplay(
-            f"{WARN_EMOJI}  Limited claims per day\n"
-            f"{WARN_EMOJI}  Standard queue — longer wait times\n"
-            f"{WARN_EMOJI}  Only a few countries available\n"
-            f"{WARN_EMOJI}  No priority support"
-        ))
-        free.add_item(discord.ui.Separator())
-        free.add_item(discord.ui.TextDisplay(
-            f"-# Want it all? Open a **Purchase** ticket to upgrade."
-        ))
-        self.add_item(free)
+        self.add_item(c)
 
 
 def _welcome_view(member: discord.Member) -> discord.ui.LayoutView:
