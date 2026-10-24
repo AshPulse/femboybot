@@ -54,6 +54,10 @@ LOADING_EMOJI  = "<a:loading:1563226245557387324>"
 
 FREE_BUILDER_IMAGE_FILENAME = "FREE_BUILDER_IMAGE_FILENAME.png"
 
+# Banner mostrato nell'embed Premium Features (postato da !ticket).
+# Metti il file "PREMIUM_FEATURES_IMAGE.jpg" nella STESSA cartella di bot.py.
+PREMIUM_FEATURES_IMAGE_FILENAME = "PREMIUM_FEATURES_IMAGE.jpg"
+
 WHITE  = 0xFFFFFF
 YELLOW = 0xFACC15
 
@@ -384,6 +388,9 @@ class PremiumFeaturesView(discord.ui.LayoutView):
             f"# {SHOP_EMOJI} Premium Features\n"
             f"Curious about what Premium Access includes? Check out every feature before you buy."
         ))
+        c.add_item(discord.ui.MediaGallery(
+            discord.MediaGalleryItem(media=f"attachment://{PREMIUM_FEATURES_IMAGE_FILENAME}")
+        ))
         c.add_item(discord.ui.Separator())
         c.add_item(discord.ui.ActionRow(
             discord.ui.Button(
@@ -685,7 +692,10 @@ async def ticket_panel_cmd(ctx):
     except Exception:
         pass
     await ctx.channel.send(view=TicketPanelView())
-    await ctx.channel.send(view=PremiumFeaturesView())
+
+    image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), PREMIUM_FEATURES_IMAGE_FILENAME)
+    file = discord.File(image_path, filename=PREMIUM_FEATURES_IMAGE_FILENAME)
+    await ctx.channel.send(view=PremiumFeaturesView(), file=file)
     try:
         await ctx.message.delete()
     except Exception:
