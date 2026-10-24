@@ -35,6 +35,9 @@ BANNED_WORDS = [w.strip().lower() for w in BANNED_WORDS_RAW.splitlines() if w.st
 # Link del pulsante "Premium Features" sotto il pannello !ticket
 PREMIUM_FEATURES_URL = "https://discord.com/channels/1562551271792181341/1562901227254185994"
 
+# Link del pulsante "Get Premium" sotto l'embed delle Free Access Builder features (!tutorial)
+GET_PREMIUM_URL = "https://discord.com/channels/1562551271792181341/1562901115803144315"
+
 # Link del pulsante "Tutorial" sotto il pannello !freeaccesspanel
 TUTORIAL_URL = "https://discord.com/channels/1562551271792181341/1562567885434523678"
 
@@ -577,6 +580,61 @@ class FreeAccessDownloadButton(discord.ui.Button):
                 pass
 
 
+FREE_BUILDER_FEATURES = [
+    "Access to the core builder",
+    "Basic export options",
+    "Community templates",
+    "Standard build speed",
+    "Manual updates",
+]
+
+
+class QuickTutorialView(discord.ui.LayoutView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        c = discord.ui.Container(accent_colour=WHITE)
+        c.add_item(discord.ui.TextDisplay(
+            f"# {GUIDE_EMOJI} Quick Tutorial\n"
+            f"-# Get the builder up and running in under a minute"
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.TextDisplay(
+            f"{DOWNLOAD_EMOJI}  **1.** Download the builder from the Free Builder panel\n"
+            f"{FOLDER_EMOJI}  **2.** Extract the downloaded file to a folder\n"
+            f"{WINDOWS_EMOJI}  **3.** Run `setup.exe` (right-click → Run as Administrator)\n"
+            f"{GUIDE_EMOJI}  **4.** Open the builder and press **Build** to generate your project"
+        ))
+        c.add_item(discord.ui.Separator())
+        c.add_item(discord.ui.TextDisplay(
+            f"-# If Windows Defender flags the file, add an exception for the folder."
+        ))
+        self.add_item(c)
+
+
+class FreeBuilderFeaturesView(discord.ui.LayoutView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        c = discord.ui.Container(accent_colour=WHITE)
+        c.add_item(discord.ui.TextDisplay(
+            f"# {FOLDER_EMOJI} Free Access Builder\n"
+            f"-# What's included with the free version"
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.TextDisplay(
+            "\n".join(f"{FOLDER_EMOJI}  +{feat}" for feat in FREE_BUILDER_FEATURES)
+        ))
+        c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
+        c.add_item(discord.ui.ActionRow(
+            discord.ui.Button(
+                label="Get Premium",
+                style=discord.ButtonStyle.link,
+                emoji=discord.PartialEmoji.from_str(MONEY_EMOJI),
+                url=GET_PREMIUM_URL,
+            ),
+        ))
+        self.add_item(c)
+
+
 class FreeAccessPanelView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
@@ -718,6 +776,23 @@ async def premium_features_cmd(ctx):
         pass
 
 
+@bot.command(name="tutorial")
+@staff_only()
+async def tutorial_cmd(ctx):
+    try:
+        async for m in ctx.channel.history(limit=20):
+            if m.author == bot.user:
+                await m.delete()
+    except Exception:
+        pass
+    await ctx.channel.send(view=QuickTutorialView())
+    await ctx.channel.send(view=FreeBuilderFeaturesView())
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+
+
 @bot.command(name="freeaccesspanel")
 @staff_only()
 async def free_access_panel_cmd(ctx):
@@ -773,7 +848,8 @@ class HelpView(BaseView):
             f"**{TICKET_EMOJI} Panels**\n"
             f"`!ticket` — Post the support/purchase ticket panel in this channel\n"
             f"`!freeaccesspanel` — Post the free builder panel in this channel\n"
-            f"`!premiumfeatures` — Post the Premium vs Free comparison in this channel"
+            f"`!premiumfeatures` — Post the Premium vs Free comparison in this channel\n"
+            f"`!tutorial` — Post the quick install tutorial + Free Builder features"
         ))
         c.add_item(discord.ui.Separator())
 
