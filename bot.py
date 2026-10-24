@@ -26,23 +26,9 @@ GENERAL_CHANNEL_ID = 1562568639838953472
 # ANCHE dentro altre parole (es. "abaa" blocca anche "xabaax").
 # Se vuoi un match solo su parola intera, dimmelo e lo cambio.
 BANNED_WORDS_RAW = """
-rat
-Rat
-rAt
-ratt
-virus
-scam
-Virus
-scamm
-Scam
-VirusTOtal
-VIrustotal
-Virustotal
-virustotal
-viruss
-dm
-d.m
-d-m
+abaa
+abasbda
+adasbdbasda
 """
 BANNED_WORDS = [w.strip().lower() for w in BANNED_WORDS_RAW.splitlines() if w.strip()]
 
@@ -702,9 +688,18 @@ async def free_access_panel_cmd(ctx):
 @staff_only_slash()
 async def autorole_cmd(interaction: discord.Interaction, role: discord.Role):
     global AUTOROLE_ID
+    if AUTOROLE_ID == role.id:
+        AUTOROLE_ID = None
+        await interaction.response.send_message(
+            f"{ALERT_EMOJI} Autorole removed. New members will no longer receive {role.mention} automatically.",
+            ephemeral=True,
+        )
+        return
+
     AUTOROLE_ID = role.id
     await interaction.response.send_message(
-        f"{ALERT_EMOJI} New members will now automatically receive {role.mention}.",
+        f"{ALERT_EMOJI} New members will now automatically receive {role.mention}.\n"
+        f"-# Run `/autorole` again with the same role to turn it off.",
         ephemeral=True,
     )
 
@@ -713,24 +708,72 @@ async def autorole_cmd(interaction: discord.Interaction, role: discord.Role):
 @app_commands.describe(role="The role to give to everyone")
 @staff_only_slash()
 async def roleall_cmd(interaction: discord.Interaction, role: discord.Role):
+    guild = interaction.guild
+
+    if not guild.me.guild_permissions.manage_roles:
+        await interaction.response.send_message(f"{WARN_EMOJI} I don't have **Manage Roles** permission.", ephemeral=True)
+        return
+    if role >= guild.me.top_role:
+        await interaction.response.send_message(
+            f"{WARN_EMOJI} That role is higher than (or equal to) my own role — move my role above it first.",
+            ephemeral=True,
+        )
+        return
+
     await interaction.response.send_message(
-        f"{LOADING_EMOJI} Giving {role.mention} to everyone, this may take a while...",
+        f"{LOADING_EMOJI} Fetching all members, this may take a while on large servers...",
         ephemeral=True,
     )
-    guild = interaction.guild
-    given, failed = 0, 0
-    async for member in guild.fetch_members(limit=None):
+
+    # Forza il refresh completo della member list, non si affida solo alla cache.
+    members = [m async for m in guild.fetch_members(limit=None)]
+
+    total    = len(members)
+    given    = 0
+    skipped  = 0
+    failed   = 0
+
+    for i, member in enumerate(members, start=1):
         if member.bot:
+            skipped += 1
             continue
         if role in member.roles:
+            skipped += 1
             continue
         try:
             await member.add_roles(role, reason=f"/roleall by {interaction.user}")
             given += 1
+        except discord.HTTPException:
+            # rate limited o errore temporaneo: riprova una volta dopo una pausa
+            await asyncio.sleep(2)
+            try:
+                await member.add_roles(role, reason=f"/roleall by {interaction.user} (retry)")
+                given += 1
+            except Exception:
+                failed += 1
         except Exception:
             failed += 1
+
+        # piccola pausa per non sbattere contro il rate limit su guild grandi
+        await asyncio.sleep(0.35)
+
+        # aggiorna il progresso ogni 25 membri processati
+        if i % 25 == 0 or i == total:
+            try:
+                await interaction.edit_original_response(
+                    content=(
+                        f"{LOADING_EMOJI} Processing... **{i}/{total}**\n"
+                        f"Given: **{given}** · Skipped: **{skipped}** · Failed: **{failed}**"
+                    )
+                )
+            except Exception:
+                pass
+
     await interaction.edit_original_response(
-        content=f"{ALERT_EMOJI} Done! Role given to **{given}** members. Failed: **{failed}**."
+        content=(
+            f"{ALERT_EMOJI} Done! Processed **{total}** members.\n"
+            f"Given: **{given}** · Already had it / bots: **{skipped}** · Failed: **{failed}**"
+        )
     )
 
 
