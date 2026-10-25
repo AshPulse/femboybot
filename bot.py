@@ -961,10 +961,12 @@ class OSSelect(discord.ui.Select):
             result_view = discord.ui.LayoutView(timeout=None)
             result_view.add_item(c)
 
+            await interaction.response.send_message(view=result_view)
             if attachment:
-                await interaction.response.send_message(view=result_view, file=attachment)
-            else:
-                await interaction.response.send_message(view=result_view)
+                try:
+                    await interaction.followup.send(file=attachment)
+                except Exception:
+                    traceback.print_exc()
         except Exception:
             traceback.print_exc()
 
