@@ -456,6 +456,13 @@ LOADING_EMOJI  = "<a:loading:1563226245557387324>"
 
 FREE_BUILDER_IMAGE_FILENAME = "FREE_BUILDER_IMAGE_FILENAME.png"
 
+# ── BUILDER FILES ──────────────────────────────────────────────────────────────
+BUILDER_WINDOWS_FILENAME = "FemboyBuilderFreeVersion.zip"
+BUILDER_LINUX_FILENAME   = ""
+
+BUILDER_WINDOWS_URL = ""   # lascia vuoto se usi il file, altrimenti metti il link
+BUILDER_LINUX_URL   = ""
+
 # Banner mostrato nell'embed Premium Features (postato da !ticket).
 # Metti il file "PREMIUM_FEATURES_IMAGE.jpg" nella STESSA cartella di bot.py.
 PREMIUM_FEATURES_IMAGE_FILENAME = "PREMIUM_FEATURES_IMAGE.jpg"
