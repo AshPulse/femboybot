@@ -882,7 +882,7 @@ def _builder_guide(os_name: str) -> str:
         return (
             f"**{GUIDE_EMOJI} Quick Setup Guide — Windows**\n"
             f"1. Extract the downloaded `.zip` file to a folder of your choice\n"
-            f"2. Right-click `FemboyBuilderFreeVersion.exe` and run it **as Administrator**\n"
+            f"2. Right-click `FemboyBuilder.Windows.exe` and run it **as Administrator**\n"
             f"3. Follow the on-screen installer steps\n"
             f"4. Launch the builder from the Start Menu shortcut\n"
             f"-# If Windows Defender flags it, add an exception for the folder."
