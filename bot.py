@@ -913,11 +913,21 @@ class OSSelect(discord.ui.Select):
             custom_id="snap:os_select",
         )
 
+    
     async def callback(self, interaction: discord.Interaction):
         try:
             os_choice = self.values[0]
             emoji     = WINDOWS_EMOJI if os_choice == "windows" else LINUX_EMOJI
             label     = "Windows" if os_choice == "windows" else "Linux"
+
+            if os_choice == "windows":
+                filename, url = BUILDER_WINDOWS_FILENAME, BUILDER_WINDOWS_URL
+            else:
+                filename, url = BUILDER_LINUX_FILENAME, BUILDER_LINUX_URL
+
+            folder    = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(folder, filename)
+            has_file  = os.path.isfile(file_path)
 
             c = discord.ui.Container(accent_colour=WHITE)
             c.add_item(discord.ui.TextDisplay(
@@ -927,14 +937,34 @@ class OSSelect(discord.ui.Select):
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
             c.add_item(discord.ui.TextDisplay(_builder_guide(os_choice)))
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
-            c.add_item(discord.ui.TextDisplay(
-                f"{WARN_EMOJI} Make sure to vouch us!."
-            ))
+
+            attachment = None
+            if url:
+                c.add_item(discord.ui.ActionRow(
+                    discord.ui.Button(
+                        label=f"Download for {label}",
+                        style=discord.ButtonStyle.link,
+                        emoji=discord.PartialEmoji.from_str(DOWNLOAD_EMOJI),
+                        url=url,
+                    ),
+                ))
+            elif has_file:
+                attachment = discord.File(file_path, filename=filename)
+                c.add_item(discord.ui.TextDisplay(
+                    f"{DOWNLOAD_EMOJI} File attached below — download it to get started."
+                ))
+            else:
+                c.add_item(discord.ui.TextDisplay(
+                    f"{WARN_EMOJI} The {label} build isn't set up yet — open a support ticket and staff will send it to you."
+                ))
 
             result_view = discord.ui.LayoutView(timeout=None)
             result_view.add_item(c)
 
-            await interaction.response.send_message(view=result_view)
+            if attachment:
+                await interaction.response.send_message(view=result_view, file=attachment)
+            else:
+                await interaction.response.send_message(view=result_view)
         except Exception:
             traceback.print_exc()
 
