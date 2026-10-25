@@ -921,7 +921,7 @@ class OSSelect(discord.ui.Select):
             c.add_item(discord.ui.TextDisplay(_builder_guide(os_choice)))
             c.add_item(discord.ui.Separator(spacing=discord.SeparatorSpacing.large))
             c.add_item(discord.ui.TextDisplay(
-                f"{WARN_EMOJI} Attach the actual build file here before sending to users."
+                f"{WARN_EMOJI} Make sure to vouch us!."
             ))
 
             result_view = discord.ui.LayoutView(timeout=None)
